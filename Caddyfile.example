@@ -1,0 +1,21 @@
+# Example Caddyfile that mirrors the production routing.
+#
+# Adjust `flora.example.com` to your real domain. In production Caddy gets
+# automatic TLS; for local you can comment out the domain and use :80.
+
+flora.example.com {
+  encode zstd gzip
+
+  # Analytics API endpoints (contract-frozen).
+  @api {
+    path /ask /smart /stats /health
+  }
+  reverse_proxy @api flora-api:8000
+
+  # Parser / agent API (optional, exposed only if your domain needs it).
+  @agent path /agent/*
+  reverse_proxy @agent flora-agent-api:8091
+
+  # Everything else → static frontend.
+  reverse_proxy frontend:80
+}

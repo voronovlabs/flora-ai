@@ -1,0 +1,76 @@
+# Local dev stack for Flora AI.
+#
+# Services
+#   postgres         — competitor price datamart (the `dm.comp_daily_prices`
+#                      table that backend /stats, /ask, /smart read from).
+#   flora-api        — analytics backend (FastAPI) at :8000.
+#   flora-agent-api  — parser/orchestration backend (FastAPI) at :8091.
+#                      Source lives in ./flora-agent-api and is unchanged.
+#   frontend         — nginx serving static index.html + src/ at :8080.
+#   caddy            — local reverse-proxy that mirrors prod routing.
+#                      Disabled by default; enable with `--profile proxy`.
+#
+# Production note: in real deploy Caddy is managed outside this compose file.
+# The `caddy` service here is just so `make up` reproduces prod routing.
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${DB_USER:-flower}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-flower}
+      POSTGRES_DB: ${DB_NAME:-flower}
+    ports:
+      - "55432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+
+  flora-api:
+    build:
+      context: ./backend
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      DB_HOST: postgres
+      DB_PORT: "5432"
+    depends_on:
+      - postgres
+    ports:
+      - "8000:8000"
+
+  flora-agent-api:
+    build:
+      context: ./flora-agent-api
+    restart: unless-stopped
+    env_file: .env
+    ports:
+      - "8091:8091"
+    # Storage is JSON-on-disk for now; mount it as a volume so state survives
+    # rebuilds. Remove this once state moves to Postgres.
+    volumes:
+      - ./flora-agent-api/app/storage:/app/app/storage
+
+  frontend:
+    build:
+      context: ./frontend
+    restart: unless-stopped
+    ports:
+      - "8080:80"
+    depends_on:
+      - flora-api
+
+  caddy:
+    profiles: ["proxy"]
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    volumes:
+      - ./Caddyfile.example:/etc/caddy/Caddyfile:ro
+    depends_on:
+      - frontend
+      - flora-api
+
+volumes:
+  postgres-data:

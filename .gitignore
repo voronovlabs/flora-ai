@@ -1,0 +1,60 @@
+# ─── Secrets ────────────────────────────────────────────────────────
+.env
+.env.local
+.env.*.local
+*.pem
+*.key
+
+# ─── Python ─────────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+*.egg
+*.egg-info/
+.eggs/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.tox/
+.coverage
+.coverage.*
+htmlcov/
+.venv/
+venv/
+venv311/
+env/
+
+# ─── Node / frontend (future) ───────────────────────────────────────
+node_modules/
+dist/
+.cache/
+.parcel-cache/
+.next/
+.nuxt/
+*.log
+npm-debug.log*
+
+# ─── IDE / OS ───────────────────────────────────────────────────────
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# ─── Legacy / scratch artifacts to never commit ─────────────────────
+*.bak
+*.bak.*
+*.broken
+*.before_*
+debug/
+**/storage/profiles/
+**/storage/*.json
+flora-clean-full.zip
+
+# ─── Docker volumes (if mounted into repo) ──────────────────────────
+data/
+postgres-data/
+flora-agent-api/

@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Flora AI - Ассистент цветочного магазина</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="src/styles.css">
+  <base target="_blank">
+</head>
+
+<body>
+  <div class="header">
+    <div class="logo">
+      <div class="logo-icon">🌿</div>
+      <span>Flora AI</span>
+    </div>
+    <div class="header-nav">
+      <button class="nav-btn active">Чат</button>
+      <button class="nav-btn">Аналитика</button>
+      <button class="nav-btn">Настройки</button>
+    </div>
+    <button class="icon-btn mobile-toggle" onclick="toggleResultsPanel()">📊</button>
+  </div>
+
+  <div class="main-content">
+    <div class="chat-section">
+      <div class="chat-messages" id="chatMessages">
+        <div class="welcome-message">
+          <div class="welcome-title">Привет! Я ваш AI-ассистент 🌸</div>
+          <div class="welcome-subtitle">
+            Помогу проанализировать цены, отследить изменения на рынке и принять решения по ассортименту.
+            Задайте вопрос или выберите один из быстрых запросов ниже.
+          </div>
+        </div>
+      </div>
+
+      <div class="input-area">
+        <div class="quick-questions">
+          <button class="quick-btn" onclick="sendPresetSafe('count_sku')">Count SKU</button>
+          <button class="quick-btn" onclick="sendPresetSafe('price_stats')">Top / Min / AVG price</button>
+          <button class="quick-btn" onclick="sendPresetSafe('top_price_changes')">Top 5 price changes</button>
+        </div>
+
+        <div class="input-container">
+          <textarea
+            class="message-input"
+            id="messageInput"
+            placeholder="Задайте вопрос о вашем цветочном бизнесе..."
+            rows="1"
+            onkeydown="handleKeyDown(event)"
+            oninput="autoResize(this)"
+          ></textarea>
+          <button class="send-btn" id="sendBtn" onclick="sendMessage()">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <line x1="22" y1="2" x2="11" y2="13"></line>
+              <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+            </svg>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <div class="results-panel" id="resultsPanel">
+
+      <div class="sources-panel">
+        <div class="sources-panel-title">Источники данных</div>
+        <div class="sources-panel-body" id="statsBox">Загружаю статистику…</div>
+      </div>
+
+      <div class="results-header">
+        <span class="results-title">Результаты запроса</span>
+        <div class="results-actions">
+          <button class="icon-btn" onclick="downloadResults()" title="Скачать CSV">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+              <polyline points="7 10 12 15 17 10"></polyline>
+              <line x1="12" y1="15" x2="12" y2="3"></line>
+            </svg>
+          </button>
+          <button class="icon-btn mobile-toggle" onclick="toggleResultsPanel()" style="display:none;">✕</button>
+        </div>
+      </div>
+      <div class="results-content" id="resultsContent">
+        <div class="empty-state">
+          <div class="empty-icon">📊</div>
+          <div class="empty-text">Здесь будут отображаться результаты ваших запросов</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="overlay" id="overlay" onclick="toggleResultsPanel()"></div>
+
+  <script type="module" src="src/app.js"></script>
+</body>
+</html>
