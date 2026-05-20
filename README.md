@@ -55,7 +55,22 @@ All paths above must remain reachable from the public origin with the
 same JSON shape. The Caddyfile and `docker-compose.yml` here both
 preserve that.
 
-## Quick start (local dev)
+## Compose flows
+
+This repo ships **two** compose files for two different shapes of
+deployment:
+
+| File                          | When to use                              | Includes                                                |
+|-------------------------------|------------------------------------------|---------------------------------------------------------|
+| `docker-compose.yml`          | local dev on your laptop                 | bundled Postgres + flora-api + flora-agent-api + nginx  |
+| `docker-compose.staging.yml`  | server with an external `flower-postgres` | flora-api + frontend only (no Postgres, no agent)       |
+
+The frontend nginx now proxies the four API paths (`/health`, `/stats`,
+`/ask`, `/smart`) through to `flora-api:8000`, so the browser keeps
+calling relative URLs in both setups. No CORS, no client-side base URL
+configuration.
+
+### Quick start — local dev
 
 ```bash
 cp .env.example .env
@@ -77,6 +92,24 @@ To run the bundled Caddy reverse-proxy locally (mirrors prod routing):
 docker compose --profile proxy up --build
 # All traffic on http://localhost
 ```
+
+### Quick start — staging / single-host server
+
+Use this when Postgres already runs on the host as the
+`flower-postgres` container bound to `:55432`.
+
+```bash
+cp .env.example .env   # if not present yet
+docker compose -f docker-compose.staging.yml up -d --build
+
+curl -s http://127.0.0.1:18082/health
+curl -s http://127.0.0.1:18082/stats | head -c 500
+curl -I http://127.0.0.1:18081
+```
+
+The UI is then on `http://SERVER_IP:18081`, the API on
+`http://SERVER_IP:18082`. See [`deploy.md`](deploy.md) for the full
+walkthrough and rollback steps.
 
 ## Service-by-service
 

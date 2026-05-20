@@ -1,7 +1,14 @@
 # Deployment
 
-This document covers the standard server deploy of the three Flora AI
-services behind Caddy.
+This document covers two deployment shapes:
+
+1. **Staging / single-host server** (see § Staging below) — only the
+   analytics frontend + flora-api run in compose; Postgres is the
+   pre-existing `flower-postgres` container on the host. This is what
+   `/opt/flora-ai` runs today.
+2. **Full stack** with bundled Postgres and the agent service behind
+   Caddy — the original layout, kept for reference. Most teams will not
+   need this.
 
 ## 0. Prerequisites on the server
 
@@ -17,6 +24,71 @@ newgrp docker
 # Git
 sudo apt-get install -y git
 ```
+
+## Staging deploy (single-host server)
+
+Used by `/opt/flora-ai`. Connects to the existing `flower-postgres`
+container on the host (port `55432`) and publishes the UI on `:18081`
+and the API on `:18082`.
+
+```bash
+cd /opt/flora-ai
+git pull
+
+# .env may already exist on the server. If not, seed from the example.
+[ -f .env ] || cp .env.example .env
+
+docker compose -f docker-compose.staging.yml up -d --build
+```
+
+Smoke tests (run on the server):
+
+```bash
+# Backend liveness + a real query that hits Postgres.
+curl -s http://127.0.0.1:18082/health
+curl -s http://127.0.0.1:18082/stats | head -c 500
+
+# Frontend reachable + proxying the API through to flora-api:8000.
+curl -I http://127.0.0.1:18081
+curl -s http://127.0.0.1:18081/stats | head -c 500
+```
+
+UI is then available at:
+
+```
+http://SERVER_IP:18081
+```
+
+How the routing works in staging:
+
+- The browser sends `GET /stats`, `POST /ask`, `POST /smart`, `GET /health`
+  to the same origin as the page (port `18081`).
+- The `frontend` container (nginx) terminates those four paths and
+  `proxy_pass`es them to `flora-api:8000` over the compose network.
+- Everything else falls through to the static SPA (`index.html`).
+
+Container-to-host DB:
+
+- `flora-api` resolves `host.docker.internal` to the Docker host gateway
+  (`extra_hosts`), so `DB_HOST=host.docker.internal` + `DB_PORT=55432`
+  reach the `flower-postgres` container that already binds `:55432` on
+  the host.
+
+To watch logs / restart only one service:
+
+```bash
+docker compose -f docker-compose.staging.yml logs -f flora-api
+docker compose -f docker-compose.staging.yml restart flora-api
+```
+
+To roll back to a previous commit:
+
+```bash
+git checkout <prev-sha>
+docker compose -f docker-compose.staging.yml up -d --build
+```
+
+---
 
 ## 1. First-time setup
 

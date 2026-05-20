@@ -1,0 +1,44 @@
+# Staging / single-host server compose.
+#
+# Differences vs. ./docker-compose.yml (which is for local dev):
+#   • NO bundled postgres — flora-api connects to an existing flower-postgres
+#     container running on the host (port 55432).
+#   • NO flora-agent-api — staging only serves the analytics UI + API.
+#   • Custom ports 18081 / 18082 to avoid colliding with anything else on
+#     the host.
+#   • host.docker.internal mapped to host-gateway so the API can reach
+#     services running directly on the Docker host.
+#
+# Usage:
+#   docker compose -f docker-compose.staging.yml up -d --build
+#
+# Smoke tests after `up`:
+#   curl -s http://127.0.0.1:18082/health
+#   curl -s http://127.0.0.1:18082/stats | head -c 500
+#   curl -I http://127.0.0.1:18081
+
+services:
+  flora-api:
+    build:
+      context: ./backend
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      DB_HOST: host.docker.internal
+      DB_PORT: "55432"
+      DB_USER: flower
+      DB_PASSWORD: flower
+      DB_NAME: flower
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    ports:
+      - "18082:8000"
+
+  frontend:
+    build:
+      context: ./frontend
+    restart: unless-stopped
+    depends_on:
+      - flora-api
+    ports:
+      - "18081:80"
