@@ -20,7 +20,7 @@
       <button class="nav-btn">Аналитика</button>
       <button class="nav-btn">Настройки</button>
     </div>
-    <button class="icon-btn mobile-toggle" onclick="toggleResultsPanel()">📊</button>
+    <button class="icon-btn mobile-toggle" data-action="toggle-results" aria-label="Toggle results">📊</button>
   </div>
 
   <div class="main-content">
@@ -37,9 +37,9 @@
 
       <div class="input-area">
         <div class="quick-questions">
-          <button class="quick-btn" onclick="sendPresetSafe('count_sku')">Count SKU</button>
-          <button class="quick-btn" onclick="sendPresetSafe('price_stats')">Top / Min / AVG price</button>
-          <button class="quick-btn" onclick="sendPresetSafe('top_price_changes')">Top 5 price changes</button>
+          <button class="quick-btn" data-action="preset" data-preset="count_sku">Count SKU</button>
+          <button class="quick-btn" data-action="preset" data-preset="price_stats">Top / Min / AVG price</button>
+          <button class="quick-btn" data-action="preset" data-preset="top_price_changes">Top 5 price changes</button>
         </div>
 
         <div class="input-container">
@@ -48,10 +48,9 @@
             id="messageInput"
             placeholder="Задайте вопрос о вашем цветочном бизнесе..."
             rows="1"
-            onkeydown="handleKeyDown(event)"
-            oninput="autoResize(this)"
+            data-input="message"
           ></textarea>
-          <button class="send-btn" id="sendBtn" onclick="sendMessage()">
+          <button class="send-btn" id="sendBtn" data-action="send-message" aria-label="Send">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <line x1="22" y1="2" x2="11" y2="13"></line>
               <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
@@ -71,14 +70,14 @@
       <div class="results-header">
         <span class="results-title">Результаты запроса</span>
         <div class="results-actions">
-          <button class="icon-btn" onclick="downloadResults()" title="Скачать CSV">
+          <button class="icon-btn" data-action="download-csv" title="Скачать CSV">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
               <polyline points="7 10 12 15 17 10"></polyline>
               <line x1="12" y1="15" x2="12" y2="3"></line>
             </svg>
           </button>
-          <button class="icon-btn mobile-toggle" onclick="toggleResultsPanel()" style="display:none;">✕</button>
+          <button class="icon-btn mobile-toggle" data-action="toggle-results" style="display:none;" aria-label="Close results">✕</button>
         </div>
       </div>
       <div class="results-content" id="resultsContent">
@@ -90,7 +89,7 @@
     </div>
   </div>
 
-  <div class="overlay" id="overlay" onclick="toggleResultsPanel()"></div>
+  <div class="overlay" id="overlay" data-action="toggle-results"></div>
 
   <script type="module" src="src/app.js"></script>
 </body>

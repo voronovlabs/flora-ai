@@ -1,7 +1,12 @@
 """LLM intent extraction + deterministic SQL builder.
 
-The LLM never writes SQL. It returns a JSON intent (`metric`, `stem`,
-`top_n`, `order`, `filters`) which we hand to `build_sql_from_intent`.
+The LLM never writes SQL. It returns a JSON intent (``metric``,
+``stem``, ``top_n``, ``order``, ``filters``) which we hand to
+``build_sql_from_intent``.
+
+Prompt template is fetched from ``ai.prompts.registry`` and the LLM
+call is routed through ``ai.providers.registry`` so this module is
+now agnostic to provider/model identities.
 """
 
 from __future__ import annotations
@@ -10,7 +15,8 @@ import json
 import re
 from typing import Any, Dict, Optional, Tuple
 
-from backend.config import SMART_DEFAULT_LIMIT, SMART_MAX_ROWS
+from backend.ai.prompts.registry import get as get_prompt
+from backend.core.config import get_settings
 from backend.services.openai_client import openai_responses_json
 
 
@@ -42,7 +48,7 @@ def coerce_int(v: Any) -> Optional[int]:
         return None
 
 
-# ── heuristic fallbacks (used both alone and as guard rails on LLM) ──
+# ── heuristic fallbacks ──────────────────────────────────────────────
 
 def simple_intent_router(text: str) -> str:
     t = (text or "").lower()
@@ -96,62 +102,15 @@ def extract_order_from_text(question: str) -> Optional[str]:
 
 # ── LLM call ─────────────────────────────────────────────────────────
 
-_SCHEMA_HINT = r"""
-You are an analytics AI for a flower business.
-
-IMPORTANT: You DO NOT write SQL.
-You ONLY return a JSON object describing user intent.
-
-Dataset (PostgreSQL):
-Table: dm.comp_daily_prices
-Columns:
-- d (date)
-- source (text)
-- product_key (text)
-- name (text)
-- price (numeric)
-
-Return JSON ONLY in this exact shape:
-{
-  "metric": "count|sum|min|max|avg|list",
-  "stem": "string or null",
-  "top_n": "integer or null",
-  "order": "asc|desc|null",
-  "filters": {
-    "source": "string or null",
-    "date": "latest|yesterday"
-  }
-}
-
-Rules:
-- "сколько/количество/есть" => metric="count"
-- "сумма/суммарная" => metric="sum"
-- "минимальная/дешевые/дешевле" => metric="list" (or min) and order="asc" when listing
-- "максимальная/дорогие/дороже" => metric="list" (or max) and order="desc" when listing
-- "покажи/список/выведи/дай" => metric="list"
-
-Top-N:
-- if user says "топ N" or "top N" or "N самых ..." => top_n=N
-
-Stem:
-- short base: "роз", "тюльпан", "пион" etc.
-
-Filters:
-- if user mentions site/competitor => filters.source
-- if "вчера" => filters.date="yesterday" else "latest"
-
-Output must be valid JSON only.
-"""
-
 
 def llm_make_intent(question: str) -> Dict[str, Any]:
-    txt = openai_responses_json(_SCHEMA_HINT.strip(), (question or "").strip())
+    instructions = get_prompt("intent_v1")
+    txt = openai_responses_json(instructions, (question or "").strip())
     try:
         parsed = json.loads(txt)
     except Exception:
         cleaned = (txt or "").strip().strip("`").replace("```json", "").replace("```", "").strip()
         parsed = json.loads(cleaned)
-
     if not isinstance(parsed, dict):
         raise RuntimeError("LLM did not return JSON object")
     return parsed
@@ -159,10 +118,14 @@ def llm_make_intent(question: str) -> Dict[str, Any]:
 
 # ── SQL builder ──────────────────────────────────────────────────────
 
+
 def build_sql_from_intent(
     intent: Dict[str, Any],
     question: str,
 ) -> Tuple[str, Tuple[Any, ...], str]:
+    settings = get_settings()
+    smart = settings.smart
+
     metric = (intent.get("metric") or "").strip().lower()
     stem = sanitize_token(intent.get("stem"), max_len=40)
 
@@ -179,7 +142,7 @@ def build_sql_from_intent(
     if top_n is None:
         top_n = extract_top_n_from_text(question)
     if top_n is not None:
-        top_n = max(1, min(int(top_n), SMART_MAX_ROWS))
+        top_n = max(1, min(int(top_n), smart.max_rows))
 
     order = (intent.get("order") or "").strip().lower() or None
     if order not in (None, "asc", "desc"):
@@ -213,37 +176,32 @@ def build_sql_from_intent(
             tuple(params),
             "Количество позиций по вашему запросу.",
         )
-
     if metric == "sum":
         return (
             f"SELECT COALESCE(SUM(price),0)::numeric AS value FROM dm.comp_daily_prices WHERE {where_sql}",
             tuple(params),
             "Суммарная цена (сумма цен) по вашему запросу.",
         )
-
     if metric == "min":
         return (
             f"SELECT MIN(price)::numeric AS value FROM dm.comp_daily_prices WHERE {where_sql}",
             tuple(params),
             "Минимальная цена по вашему запросу.",
         )
-
     if metric == "max":
         return (
             f"SELECT MAX(price)::numeric AS value FROM dm.comp_daily_prices WHERE {where_sql}",
             tuple(params),
             "Максимальная цена по вашему запросу.",
         )
-
     if metric == "avg":
         return (
             f"SELECT AVG(price)::numeric AS value FROM dm.comp_daily_prices WHERE {where_sql}",
             tuple(params),
             "Средняя цена по вашему запросу.",
         )
-
     if metric == "list":
-        limit = top_n if top_n is not None else min(SMART_DEFAULT_LIMIT, SMART_MAX_ROWS)
+        limit = top_n if top_n is not None else min(smart.default_limit, smart.max_rows)
         sql = (
             "SELECT d, source, name, price "
             "FROM dm.comp_daily_prices "

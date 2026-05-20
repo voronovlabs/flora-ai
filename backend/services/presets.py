@@ -1,17 +1,25 @@
-"""Hardcoded preset queries powering the three quick-buttons.
+"""Three preset queries powering the quick-button row.
 
-Each returns a fully-formed `/ask` response payload to keep the route
-handler trivial.
+SQL constants now live in ``repositories.prices`` so the LLM safety
+net and the presets share a single source of truth. The functions
+here only do *formatting* — the data fetch is delegated.
 """
 
 from __future__ import annotations
 
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 
-from backend.db.postgres import run_sql_text
+from backend.repositories.prices import (
+    PricesRepository,
+    SQL_COUNT_SKU,
+    SQL_PRICE_STATS,
+    SQL_TOP_PRICE_CHANGES,
+    SQL_SNAPSHOT_DATE,  # noqa: F401  (re-exported for backward compat)
+)
 
 
-# ── small formatters ────────────────────────────────────────────────
+# ── formatters ──────────────────────────────────────────────────────
+
 
 def _fmt_int(x: Any) -> str:
     try:
@@ -36,7 +44,7 @@ def _fmt_rub(v: Any) -> str:
         return str(v)
 
 
-def _fmt_pct(old_v: Any, diff_v: Any):
+def _fmt_pct(old_v: Any, diff_v: Any) -> Optional[float]:
     try:
         o = float(old_v)
         d = float(diff_v)
@@ -47,131 +55,22 @@ def _fmt_pct(old_v: Any, diff_v: Any):
         return None
 
 
-# ── SQL ──────────────────────────────────────────────────────────────
-
-SQL_COUNT_SKU = """
-with last_per_source as (
-  select source, max(d) as d
-  from dm.comp_daily_prices
-  where product_key is not null
-    and source is not null
-    and source <> 'unknown'
-  group by source
-),
-agg as (
-  select
-    case
-      when p.source in ('florist_ru','florist.ru','florist') then 'florist.ru'
-      else p.source
-    end as source,
-    count(distinct p.product_key) as sku_count
-  from dm.comp_daily_prices p
-  join last_per_source l
-    on p.source = l.source and p.d = l.d
-  group by 1
-)
-select source, sku_count
-from agg
-order by sku_count desc;
-""".strip()
+# ── handlers ────────────────────────────────────────────────────────
 
 
-SQL_PRICE_STATS = """
-with last_per_source as (
-  select distinct on (source)
-         source, d
-  from dm.comp_daily_prices
-  where price > 0
-  order by source, d desc
-)
-select
-  p.source,
-  round(min(p.price),0) as min_price,
-  round(avg(p.price),0) as avg_price,
-  round(max(p.price),0) as max_price
-from dm.comp_daily_prices p
-join last_per_source l
-  on p.source = l.source
- and p.d = l.d
-where p.price > 0
-group by p.source
-order by p.source;
-""".strip()
-
-
-SQL_TOP_PRICE_CHANGES = """
-with days as (
-  select
-    max(d) as d_today,
-    (select max(d) from dm.comp_daily_prices
-      where d < (select max(d) from dm.comp_daily_prices)
-    ) as d_prev
-  from dm.comp_daily_prices
-),
-today as (
-  select source, product_key, coalesce(name, '') as name, price
-  from dm.comp_daily_prices p
-  join days d on p.d = d.d_today
-  where price > 0
-),
-prev as (
-  select source, product_key, price
-  from dm.comp_daily_prices p
-  join days d on p.d = d.d_prev
-  where price > 0
-),
-base as (
-  select
-    t.source,
-    t.product_key,
-    t.name,
-    p.price as old_price,
-    t.price as new_price,
-    (t.price - p.price) as diff
-  from today t
-  join prev p using (source, product_key)
-),
-ranked as (
-  select
-    source, product_key, name, old_price, new_price, diff,
-    row_number() over(partition by source order by abs(diff) desc) as rn
-  from base
-)
-select source, name, old_price, new_price, diff
-from ranked
-where rn <= 5
-order by source, abs(diff) desc;
-""".strip()
-
-
-SQL_SNAPSHOT_DATE = (
-    "select max(d) as d from dm.comp_daily_prices "
-    "where source is not null and source <> 'unknown'"
-)
-
-
-# ── preset handlers ──────────────────────────────────────────────────
-
-def _snapshot_date() -> str | None:
-    snap_row = run_sql_text(SQL_SNAPSHOT_DATE, limit=1)
-    if snap_row and snap_row[0].get("d") is not None:
-        return str(snap_row[0]["d"])
-    return None
-
-
-def run_count_sku() -> Dict[str, Any]:
-    data = run_sql_text(SQL_COUNT_SKU, limit=50)
-    snap = _snapshot_date()
+def run_count_sku(repo: Optional[PricesRepository] = None) -> Dict[str, Any]:
+    repo = repo or PricesRepository()
+    data = repo.sku_counts()[:50]
+    snap = repo.snapshot().date_str
 
     title = "📊 Ассортимент конкурентов"
     if snap:
         title += " на " + snap
     title += ":"
-
     lines = [title, ""]
 
     best_src, best_cnt = None, None
-    for r in (data or []):
+    for r in data:
         src_name = r.get("source") or "—"
         cnt = r.get("sku_count") or 0
         lines.append("• {} — {} позиций".format(src_name, _fmt_int(cnt)))
@@ -188,13 +87,14 @@ def run_count_sku() -> Dict[str, Any]:
     return {"ok": True, "answer": "\n".join(lines), "sql": SQL_COUNT_SKU, "data": data}
 
 
-def run_price_stats() -> Dict[str, Any]:
-    data = run_sql_text(SQL_PRICE_STATS, limit=50)
+def run_price_stats(repo: Optional[PricesRepository] = None) -> Dict[str, Any]:
+    repo = repo or PricesRepository()
+    data = repo.price_stats()
 
     title = "📈 Цены у конкурентов"
     lines = [title + ":"]
 
-    for r in (data or []):
+    for r in data:
         if not isinstance(r, dict):
             continue
         src_name = r.get("source") or "unknown"
@@ -207,7 +107,7 @@ def run_price_stats() -> Dict[str, Any]:
 
     best_src = None
     best_max = None
-    for r in (data or []):
+    for r in data:
         if not isinstance(r, dict):
             continue
         mx = r.get("max_price")
@@ -230,15 +130,14 @@ def run_price_stats() -> Dict[str, Any]:
     return {"ok": True, "answer": "\n".join(lines), "sql": SQL_PRICE_STATS, "data": data}
 
 
-def run_top_price_changes() -> Dict[str, Any]:
-    data = run_sql_text(SQL_TOP_PRICE_CHANGES, limit=200)
+def run_top_price_changes(repo: Optional[PricesRepository] = None) -> Dict[str, Any]:
+    repo = repo or PricesRepository()
+    data = repo.top_price_changes()
 
     title = "📉📈 Топ-изменения цен у конкурентов"
     lines = [title + ":"]
 
-    rows = [r for r in (data or []) if isinstance(r, dict)]
-    rows = rows[:5]
-
+    rows = [r for r in data if isinstance(r, dict)][:5]
     for r in rows:
         src_name = r.get("source") or "unknown"
         name = (r.get("name") or "").strip()

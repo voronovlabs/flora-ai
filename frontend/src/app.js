@@ -1,128 +1,95 @@
-// Entry point: wires DOM, exposes a stable set of globals for inline
-// onclick/onkeydown handlers used in index.html (kept for safe refactor).
+// Entry point. Three jobs only:
+//   1. Mount components against the DOM and the store.
+//   2. Wire event-delegation: every interactive element uses
+//      data-action / data-input, no inline handlers, no window.* globals.
+//   3. Boot-time data loads (currently /stats).
+//
+// Anything domain-specific (chat lifecycle, results rendering, etc.)
+// lives in dedicated modules.
 
-import { bindRefs, refs, autoResize } from './ui.js';
-import { getStats, askPreset, askSmart } from './api.js';
-import {
-  addMessage,
-  addLoadingMessage,
-  removeLoadingMessage,
-  addAssistantMessage,
-  toggleDataBlock,
-} from './components/messages.js';
-import {
-  updateResultsPanel,
-  toggleResultsPanel,
-  openResultsPanelOnMobile,
-  downloadResults,
-} from './components/results-panel.js';
-import { renderStatsBox } from './components/stats-box.js';
+import { autoResize } from './ui.js';
+import { getStats } from './api.js';
+import { store } from './state/store.js';
+import { statsLoaded, statsFailed, togglePanel } from './state/actions.js';
+import { ChatEngine } from './chat/engine.js';
+import { mountMessages, toggleDataBlock } from './components/messages.js';
+import { mountResultsPanel, downloadCsv } from './components/results-panel.js';
+import { mountStatsBox } from './components/stats-box.js';
+import { isDebugMode } from './core/logger.js';
+import { setDebug } from './state/actions.js';
 
-const PRESET_LABELS = {
-  count_sku: 'Count SKU',
-  price_stats: 'Top / Min / AVG price',
-  top_price_changes: 'Top 5 price changes',
-};
+function $(id) { return document.getElementById(id); }
 
-async function sendPresetSafe(presetId) {
-  const label = PRESET_LABELS[presetId] || 'Preset: ' + presetId;
-  try {
-    addMessage(label, true);
-    addLoadingMessage();
-    if (refs.sendBtn) refs.sendBtn.disabled = true;
-
-    const { ok, status, text, payload } = await askPreset(presetId);
-    removeLoadingMessage();
-
-    if (!ok) {
-      addAssistantMessage('API error: ' + status + '\n' + text, null, null);
-      return;
+function bindEventDelegation() {
+  document.addEventListener('click', (e) => {
+    const target = e.target.closest('[data-action]');
+    if (!target) return;
+    const action = target.dataset.action;
+    switch (action) {
+      case 'preset':
+        ChatEngine.sendPreset(target.dataset.preset);
+        break;
+      case 'send-message':
+        sendCurrentInput();
+        break;
+      case 'toggle-results':
+        store.dispatch(togglePanel());
+        break;
+      case 'download-csv':
+        downloadCsv();
+        break;
+      case 'toggle-data-block':
+        toggleDataBlock(target);
+        break;
+      default:
+        // unknown action — ignore on purpose.
+        break;
     }
+  });
 
-    const answer = (payload && (payload.answer || payload.echo))
-      ? (payload.answer || payload.echo)
-      : (text || 'OK');
-    const sql = payload && payload.sql ? payload.sql : null;
-    const data = payload && payload.data ? payload.data : null;
-
-    addAssistantMessage(String(answer), sql, data);
-
-    if (data && Array.isArray(data) && data.length > 0) {
-      updateResultsPanel(data);
-      openResultsPanelOnMobile();
-    }
-  } catch (e) {
-    try { removeLoadingMessage(); } catch (_) {}
-    addAssistantMessage('API call failed (/smart). Check flora-api container.', null, null);
-    // eslint-disable-next-line no-console
-    console.error(e);
-  } finally {
-    if (refs.sendBtn) refs.sendBtn.disabled = false;
+  const ta = $('messageInput');
+  if (ta) {
+    ta.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        sendCurrentInput();
+      }
+    });
+    ta.addEventListener('input', () => autoResize(ta));
   }
 }
 
-async function sendMessage() {
-  const question = (refs.messageInput && refs.messageInput.value ? refs.messageInput.value : '').trim();
-  if (!question) return;
-
-  addMessage(question, true);
-  refs.messageInput.value = '';
-  refs.messageInput.style.height = 'auto';
-
-  addLoadingMessage();
-  refs.sendBtn.disabled = true;
-
-  try {
-    const { ok, status, text, payload } = await askSmart(question);
-    removeLoadingMessage();
-
-    if (!ok) {
-      addAssistantMessage('API error: ' + status + '\n' + text, null, null);
-      return;
-    }
-
-    const answer = (payload && (payload.answer || payload.echo))
-      ? (payload.answer || payload.echo)
-      : (text || 'OK');
-    const sql = payload && payload.sql ? payload.sql : null;
-    const data = payload && payload.data ? payload.data : null;
-
-    addAssistantMessage(String(answer), sql, data);
-
-    if (data && Array.isArray(data)) {
-      updateResultsPanel(data);
-      openResultsPanelOnMobile();
-    }
-  } catch (error) {
-    removeLoadingMessage();
-    addAssistantMessage('API call failed (/smart). Check flora-api container.', null, null);
-    // eslint-disable-next-line no-console
-    console.error(error);
-  } finally {
-    refs.sendBtn.disabled = false;
-  }
+function sendCurrentInput() {
+  const ta = $('messageInput');
+  if (!ta) return;
+  const text = (ta.value || '').trim();
+  if (!text) return;
+  ChatEngine.sendSmart(text);
+  ta.value = '';
+  ta.style.height = 'auto';
 }
 
-function handleKeyDown(event) {
-  if (event.key === 'Enter' && !event.shiftKey) {
-    event.preventDefault();
-    sendMessage();
-  }
+function bootStats() {
+  getStats()
+    .then((payload) => {
+      if (payload && payload.ok) store.dispatch(statsLoaded(payload));
+      else store.dispatch(statsFailed('not ok'));
+    })
+    .catch((err) => store.dispatch(statsFailed(String(err))));
 }
 
 window.addEventListener('DOMContentLoaded', () => {
-  bindRefs();
-  getStats()
-    .then((j) => renderStatsBox(j))
-    .catch(() => renderStatsBox(null));
-});
+  // Sync debug flag from logger → store so components can react.
+  store.dispatch(setDebug(isDebugMode()));
 
-// Inline HTML uses these names directly (onclick="…"), so expose them on window.
-// This keeps the refactor visually identical and the diff minimal.
-window.sendPresetSafe = sendPresetSafe;
-window.sendMessage = sendMessage;
-window.handleKeyDown = handleKeyDown;
-window.autoResize = autoResize;
-window.toggleResultsPanel = toggleResultsPanel;
-window.toggleDataBlock = toggleDataBlock;
-window.downloadResults = downloadResults;
+  mountMessages($('chatMessages'));
+  mountStatsBox($('statsBox'));
+  mountResultsPanel({
+    panel: $('resultsPanel'),
+    content: $('resultsContent'),
+    overlay: $('overlay'),
+  });
+
+  bindEventDelegation();
+  bootStats();
+});

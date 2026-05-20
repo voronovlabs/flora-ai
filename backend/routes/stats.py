@@ -1,23 +1,21 @@
-"""GET /stats — competitor SKU snapshot powering the right-side panel."""
+"""GET /stats — competitor SKU snapshot powering the right-side panel.
+
+Response shape: ``{ok, snapshot_date, total_sku, sources[]}`` — frozen.
+"""
 
 from __future__ import annotations
 
 from fastapi import APIRouter
 
-from backend.db.postgres import run_sql_text
-from backend.services.presets import SQL_COUNT_SKU, SQL_SNAPSHOT_DATE
+from backend.deps import PricesRepo_
 
 router = APIRouter()
 
 
 @router.get("/stats")
-def stats():
-    snap_row = run_sql_text(SQL_SNAPSHOT_DATE, limit=1)
-    snap = None
-    if snap_row and snap_row[0].get("d") is not None:
-        snap = str(snap_row[0]["d"])
-
-    rows = run_sql_text(SQL_COUNT_SKU, limit=200) or []
+def stats(repo: PricesRepo_):
+    snap = repo.snapshot().date_str
+    rows = repo.sku_counts()
 
     total = 0
     sources = []

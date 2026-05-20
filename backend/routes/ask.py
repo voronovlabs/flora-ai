@@ -1,13 +1,15 @@
 """POST /ask — preset-driven Q&A.
 
-Free-form `question` is reserved for /smart; here we only accept the
-three known presets used by the quick-buttons.
+Free-form ``question`` is reserved for /smart; here we only accept
+the three known presets used by the quick-buttons. Response shape is
+the legacy ``{ok, answer, sql, data}`` and MUST NOT change.
 """
 
 from __future__ import annotations
 
 from fastapi import APIRouter
 
+from backend.deps import PricesRepo_
 from backend.schemas.questions import Question
 from backend.services.presets import (
     run_count_sku,
@@ -19,16 +21,15 @@ router = APIRouter()
 
 
 @router.post("/ask")
-def ask(q: Question):
+def ask(q: Question, repo: PricesRepo_):
     preset = (getattr(q, "preset", None) or "").strip()
 
-    if preset:
-        if preset == "count_sku":
-            return run_count_sku()
-        if preset == "price_stats":
-            return run_price_stats()
-        if preset == "top_price_changes":
-            return run_top_price_changes()
+    if preset == "count_sku":
+        return run_count_sku(repo)
+    if preset == "price_stats":
+        return run_price_stats(repo)
+    if preset == "top_price_changes":
+        return run_top_price_changes(repo)
 
     return {
         "ok": True,

@@ -1,8 +1,4 @@
-"""GET /health — DB liveness probe.
-
-Returns 200 with a row from `now()` so a reverse proxy can verify both
-the FastAPI process and the Postgres connection are alive.
-"""
+"""GET /health — DB liveness probe."""
 
 from __future__ import annotations
 
