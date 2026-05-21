@@ -2,121 +2,176 @@
 //   1. Mount components against the DOM and the store.
 //   2. Wire event-delegation: every interactive element uses
 //      data-action / data-input, no inline handlers, no window.* globals.
-//   3. Boot-time data loads (currently /stats).
+//   3. Boot-time data loads (currently /stats + dashboard KPI bootstrap).
 //
 // Anything domain-specific (chat lifecycle, results rendering, etc.)
-// lives in dedicated modules.
-//
-// IMPORTANT — boot timing:
-// Module scripts are deferred, so by the time this top-level code runs the
-// DOM is already parsed. We DO NOT wrap boot() in DOMContentLoaded — that
-// listener can race with a fired-but-not-yet-flushed event in some module
-// load paths and silently never run. Boot immediately, defensively.
+// lives in dedicated modules. ChatEngine and the store are untouched
+// from prior turns.
 
 import { autoResize } from './ui.js';
 import { getStats } from './api.js';
 import { store } from './state/store.js';
-import { statsLoaded, statsFailed, togglePanel, setDebug } from './state/actions.js';
+import { statsLoaded, statsFailed, togglePanel, setPanelOpen, setDebug } from './state/actions.js';
 import { ChatEngine } from './chat/engine.js';
 import { mountMessages, toggleDataBlock } from './components/messages.js';
 import { mountResultsPanel, downloadCsv } from './components/results-panel.js';
 import { mountStatsBox } from './components/stats-box.js';
+import { mountDashboardTop } from './components/dashboard-top.js';
+import { mountTabs, setTab } from './components/tabs.js';
 import { isDebugMode } from './core/logger.js';
 
 function $(id) { return document.getElementById(id); }
 
 function bindEventDelegation() {
-  document.addEventListener('click', (e) => {
-    const target = e.target.closest && e.target.closest('[data-action]');
+  document.addEventListener('click', function (e) {
+    var target = (e.target && e.target.closest) ? e.target.closest('[data-action]') : null;
     if (!target) return;
-    const action = target.dataset.action;
+    var action = target.dataset.action;
     switch (action) {
       case 'preset':
         ChatEngine.sendPreset(target.dataset.preset);
+        scrollChatIntoView();
         break;
+
       case 'send-message':
         sendCurrentInput();
         break;
+
+      case 'smart-question':
+        // Action card with a pre-built natural-language question — feeds
+        // the same /smart pipeline the user gets from the composer.
+        if (target.dataset.question) {
+          ChatEngine.sendSmart(target.dataset.question);
+          scrollChatIntoView();
+        }
+        break;
+
+      case 'focus-composer':
+        focusComposer();
+        break;
+
+      case 'tab':
+        // Mobile-only tab switch between Chat and Results.
+        var t = target.dataset.tab;
+        if (t === 'results') {
+          // Reuse the existing panel state so the right-panel JS
+          // subscribers still fire on toggle.
+          store.dispatch(setPanelOpen(true));
+        } else {
+          store.dispatch(setPanelOpen(false));
+        }
+        setTab(t);
+        var ws = document.querySelector('.workspace');
+        if (ws) ws.setAttribute('data-active-tab', t);
+        break;
+
       case 'toggle-results':
         store.dispatch(togglePanel());
         break;
+
       case 'download-csv':
         downloadCsv();
         break;
+
       case 'toggle-data-block':
         toggleDataBlock(target);
         break;
+
       default:
-        // unknown action — ignore on purpose.
         break;
     }
   });
 
-  const ta = $('messageInput');
+  var ta = $('messageInput');
   if (ta) {
-    ta.addEventListener('keydown', (e) => {
+    ta.addEventListener('keydown', function (e) {
       if (e.key === 'Enter' && !e.shiftKey) {
         e.preventDefault();
         sendCurrentInput();
       }
     });
-    ta.addEventListener('input', () => autoResize(ta));
+    ta.addEventListener('input', function () { autoResize(ta); });
   }
 }
 
 function sendCurrentInput() {
-  const ta = $('messageInput');
+  var ta = $('messageInput');
   if (!ta) return;
-  const text = (ta.value || '').trim();
+  var text = (ta.value || '').trim();
   if (!text) return;
   ChatEngine.sendSmart(text);
   ta.value = '';
   ta.style.height = 'auto';
+  scrollChatIntoView();
+}
+
+function focusComposer() {
+  var ta = $('messageInput');
+  if (!ta) return;
+  ta.focus();
+  // Move viewport so the composer is visible (mobile).
+  ta.scrollIntoView({ behavior: 'smooth', block: 'center' });
+}
+
+function scrollChatIntoView() {
+  // After the user fires a question from a quick-action, make sure the
+  // chat scrolls into view so the response bubble is immediately visible.
+  var chat = $('chatMessages');
+  if (!chat) return;
+  chat.scrollTop = chat.scrollHeight;
+  // Also scroll the chat-area into the page viewport (helps on mobile
+  // when the user clicked an action card and the chat lives below).
+  var area = chat.closest && chat.closest('.chat-area');
+  if (area && area.scrollIntoView) {
+    try { area.scrollIntoView({ behavior: 'smooth', block: 'start' }); } catch (_) {}
+  }
 }
 
 function bootStats() {
   getStats()
-    .then((payload) => {
+    .then(function (payload) {
       if (payload && payload.ok) store.dispatch(statsLoaded(payload));
       else store.dispatch(statsFailed('not ok'));
     })
-    .catch((err) => store.dispatch(statsFailed(String(err))));
+    .catch(function (err) { store.dispatch(statsFailed(String(err))); });
 }
 
 function safe(label, fn) {
   try { fn(); }
   catch (err) {
     // One failed mount must not block the rest of the boot — most
-    // importantly bindEventDelegation, which is what makes the
-    // quick-buttons / send-button responsive.
+    // importantly bindEventDelegation, which makes the quick-buttons
+    // and Enter-to-send responsive.
     // eslint-disable-next-line no-console
     console.error('[flora] boot step failed:', label, err);
   }
 }
 
 function boot() {
-  // Event delegation FIRST, so even if a mount later throws, the
-  // quick-buttons and the send button still respond to user input.
+  // Event delegation FIRST: even if a later mount throws, the
+  // action-cards / send-button still respond.
   safe('bindEventDelegation', bindEventDelegation);
-  safe('setDebug',            () => store.dispatch(setDebug(isDebugMode())));
-  safe('mountMessages',       () => mountMessages($('chatMessages')));
-  safe('mountStatsBox',       () => mountStatsBox($('statsBox')));
-  safe('mountResultsPanel',   () => mountResultsPanel({
-    panel:   $('resultsPanel'),
-    content: $('resultsContent'),
-    overlay: $('overlay'),
-  }));
+  safe('setDebug',            function () { store.dispatch(setDebug(isDebugMode())); });
+  safe('mountDashboardTop',   function () { mountDashboardTop($('dashboardTop')); });
+  safe('mountTabs',           function () { mountTabs($('mobileTabs')); });
+  safe('mountMessages',       function () { mountMessages($('chatMessages')); });
+  safe('mountStatsBox',       function () { mountStatsBox($('statsBox')); });
+  safe('mountResultsPanel',   function () {
+    mountResultsPanel({
+      panel:   $('resultsPanel'),
+      content: $('resultsContent'),
+      overlay: $('overlay'),
+    });
+  });
   safe('bootStats', bootStats);
   // eslint-disable-next-line no-console
   console.info('[flora] booted');
 }
 
-// Module scripts execute after the document has been parsed, so the DOM is
-// already available when we get here. The legacy DOMContentLoaded wrapper
-// is gone on purpose — see the file header.
+// Module scripts execute after the document has been parsed, so the DOM
+// is already available. We boot immediately; the listener below is only
+// a defensive fallback for environments that strip module-deferral.
 if (document.readyState === 'loading') {
-  // Defensive: still possible if some older browser/proxy strips the
-  // defer behavior from module scripts.
   document.addEventListener('DOMContentLoaded', boot, { once: true });
 } else {
   boot();

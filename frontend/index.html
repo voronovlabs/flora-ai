@@ -3,91 +3,124 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Flora AI - Ассистент цветочного магазина</title>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <title>Flora AI — рыночная аналитика для цветочного бизнеса</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/src/styles.css">
   <base target="_blank">
 </head>
 
 <body>
-  <div class="header">
-    <div class="logo">
-      <div class="logo-icon">🌿</div>
-      <span>Flora AI</span>
-    </div>
-    <div class="header-nav">
-      <button class="nav-btn active">Чат</button>
-      <button class="nav-btn">Аналитика</button>
-      <button class="nav-btn">Настройки</button>
-    </div>
-    <button class="icon-btn mobile-toggle" data-action="toggle-results" aria-label="Toggle results">📊</button>
-  </div>
 
-  <div class="main-content">
-    <div class="chat-section">
-      <div class="chat-messages" id="chatMessages">
-        <div class="welcome-message">
-          <div class="welcome-title">Привет! Я ваш AI-ассистент 🌸</div>
-          <div class="welcome-subtitle">
-            Помогу проанализировать цены, отследить изменения на рынке и принять решения по ассортименту.
-            Задайте вопрос или выберите один из быстрых запросов ниже.
-          </div>
+  <header class="app-header">
+    <div class="app-header__inner">
+      <div class="brand">
+        <div class="brand__mark">🌿</div>
+        <div class="brand__name">
+          <span class="brand__name-row">Flora<span class="brand__name-accent">AI</span></span>
+          <span class="brand__tag">Market intelligence</span>
         </div>
       </div>
+      <nav class="header-nav">
+        <button class="nav-btn nav-btn--active">Чат</button>
+        <button class="nav-btn">Аналитика</button>
+        <button class="nav-btn">Настройки</button>
+      </nav>
+      <div class="header-side">
+        <button class="icon-btn icon-btn--ghost" aria-label="User menu" title="Профиль">👤</button>
+      </div>
+    </div>
+  </header>
 
-      <div class="input-area">
-        <div class="quick-questions">
-          <button class="quick-btn" data-action="preset" data-preset="count_sku">Count SKU</button>
-          <button class="quick-btn" data-action="preset" data-preset="price_stats">Top / Min / AVG price</button>
-          <button class="quick-btn" data-action="preset" data-preset="top_price_changes">Top 5 price changes</button>
+  <main class="app-shell">
+
+    <!-- LEFT: workspace = dashboard + chat + composer -->
+    <section class="workspace">
+
+      <!-- KPI · Insights · Action cards -->
+      <div class="dashboard-top" id="dashboardTop">
+        <!-- rendered by components/dashboard-top.js -->
+      </div>
+
+      <!-- Mobile tab switcher (hidden on desktop) -->
+      <nav class="mobile-tabs" id="mobileTabs" data-active-tab="chat">
+        <button class="mobile-tabs__btn is-active" data-action="tab" data-tab="chat">💬 Чат</button>
+        <button class="mobile-tabs__btn" data-action="tab" data-tab="results">📊 Результаты</button>
+      </nav>
+
+      <!-- Chat -->
+      <section class="chat-area">
+        <div class="chat-messages" id="chatMessages">
+          <div class="welcome-message">
+            <div class="welcome-message__halo"></div>
+            <h1 class="welcome-message__title">Привет! Я ваш рыночный ассистент 🌸</h1>
+            <p class="welcome-message__subtitle">
+              Помогу проанализировать цены, отследить изменения на рынке и принять решения по
+              ассортименту. Выберите одно из быстрых действий выше или задайте свой вопрос.
+            </p>
+          </div>
         </div>
+      </section>
 
-        <div class="input-container">
+      <!-- Composer (sticky bottom of workspace) -->
+      <div class="composer">
+        <div class="composer__inner">
           <textarea
-            class="message-input"
+            class="composer__input"
             id="messageInput"
-            placeholder="Задайте вопрос о вашем цветочном бизнесе..."
+            placeholder="Спросите о ценах, ассортименте, конкурентах…"
             rows="1"
             data-input="message"
           ></textarea>
-          <button class="send-btn" id="sendBtn" data-action="send-message" aria-label="Send">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <button class="composer__send" id="sendBtn" data-action="send-message" aria-label="Отправить">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                 stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <line x1="22" y1="2" x2="11" y2="13"></line>
               <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
             </svg>
           </button>
         </div>
-      </div>
-    </div>
-
-    <div class="results-panel" id="resultsPanel">
-
-      <div class="sources-panel">
-        <div class="sources-panel-title">Источники данных</div>
-        <div class="sources-panel-body" id="statsBox">Загружаю статистику…</div>
+        <div class="composer__hint">⏎ — отправить · Shift+⏎ — перенос строки</div>
       </div>
 
-      <div class="results-header">
-        <span class="results-title">Результаты запроса</span>
-        <div class="results-actions">
-          <button class="icon-btn" data-action="download-csv" title="Скачать CSV">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-              <polyline points="7 10 12 15 17 10"></polyline>
-              <line x1="12" y1="15" x2="12" y2="3"></line>
-            </svg>
-          </button>
-          <button class="icon-btn mobile-toggle" data-action="toggle-results" style="display:none;" aria-label="Close results">✕</button>
+    </section>
+
+    <!-- RIGHT: analytics panel (sticky) -->
+    <aside class="analytics-panel" id="resultsPanel">
+
+      <article class="panel-card panel-card--sources">
+        <header class="panel-card__head">
+          <span class="panel-card__dot"></span>
+          <h3 class="panel-card__title">Источники данных</h3>
+        </header>
+        <div class="panel-card__body" id="statsBox">Загружаю статистику…</div>
+      </article>
+
+      <article class="panel-card panel-card--results">
+        <header class="panel-card__head">
+          <span class="panel-card__dot panel-card__dot--accent"></span>
+          <h3 class="panel-card__title">Результаты запроса</h3>
+          <div class="panel-card__actions">
+            <button class="icon-btn" data-action="download-csv" title="Скачать CSV" aria-label="Скачать CSV">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                <polyline points="7 10 12 15 17 10"></polyline>
+                <line x1="12" y1="15" x2="12" y2="3"></line>
+              </svg>
+            </button>
+            <button class="icon-btn mobile-toggle" data-action="toggle-results" style="display:none;" aria-label="Закрыть">✕</button>
+          </div>
+        </header>
+        <div class="panel-card__body panel-card__body--scroll" id="resultsContent">
+          <div class="empty-state">
+            <div class="empty-state__icon">📊</div>
+            <div class="empty-state__text">Здесь будут отображаться результаты ваших запросов</div>
+          </div>
         </div>
-      </div>
-      <div class="results-content" id="resultsContent">
-        <div class="empty-state">
-          <div class="empty-icon">📊</div>
-          <div class="empty-text">Здесь будут отображаться результаты ваших запросов</div>
-        </div>
-      </div>
-    </div>
-  </div>
+      </article>
+
+    </aside>
+
+  </main>
 
   <div class="overlay" id="overlay" data-action="toggle-results"></div>
 
