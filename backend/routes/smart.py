@@ -24,8 +24,7 @@ from fastapi import APIRouter
 from backend.core.config import get_settings
 from backend.core.logging import get_logger
 from backend.deps import PricesRepo_
-from backend.routes.ask import ask
-from backend.schemas.questions import Question, SmartQuery
+from backend.schemas.questions import SmartQuery
 from backend.services.intent import (
     build_sql_from_intent,
     extract_order_from_text,
@@ -33,6 +32,7 @@ from backend.services.intent import (
     llm_make_intent,
     simple_intent_router,
 )
+from backend.services.presets import run_preset
 from backend.services.sql_safety import (
     enforce_limit,
     extract_tables,
@@ -54,7 +54,7 @@ def smart(q: SmartQuery, repo: PricesRepo_):
     # ── No LLM key → heuristic-only fallback ─────────────────────────
     if not settings.ai.openai_api_key:
         intent = simple_intent_router(question)
-        res = ask(Question(question=question, preset=intent), repo=repo)
+        res = run_preset(intent, repo)
         if isinstance(res, dict) and q.debug:
             res["intent"] = intent
             res["llm"] = False
@@ -98,7 +98,7 @@ def smart(q: SmartQuery, repo: PricesRepo_):
         ok, err = validate_llm_sql(sql_text)
         if not ok:
             intent = simple_intent_router(question)
-            res = ask(Question(question=question, preset=intent), repo=repo)
+            res = run_preset(intent, repo)
             if isinstance(res, dict):
                 res["llm"] = False
                 res["fallback_reason"] = f"Built SQL rejected: {err}"
@@ -128,7 +128,7 @@ def smart(q: SmartQuery, repo: PricesRepo_):
     except Exception as e:
         log.warning("smart pipeline error, falling back", extra={"err": str(e)[:200]})
         intent = simple_intent_router(question)
-        res = ask(Question(question=question, preset=intent), repo=repo)
+        res = run_preset(intent, repo)
         if isinstance(res, dict):
             res["llm"] = False
             res["fallback_reason"] = f"LLM error: {str(e)[:200]}"

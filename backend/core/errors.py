@@ -67,3 +67,35 @@ async def flora_error_handler(request: Request, exc: FloraError) -> JSONResponse
             "_meta": {"request_id": current_request_id()},
         },
     )
+
+
+async def unhandled_exception_handler(request: Request, exc: Exception) -> JSONResponse:
+    """Catch-all 500 handler.
+
+    The default FastAPI behavior is to return ``{"detail": "Internal Server
+    Error"}`` with no correlation. That makes incidents painful to debug.
+    Here we log the full traceback under the request's id and return a
+    stable envelope so the client can show the rid back to support.
+    """
+    # Imported lazily so middleware can import errors.py without a cycle.
+    from backend.core.logging import get_logger
+    from backend.core.middleware import current_request_id
+
+    rid = current_request_id()
+    get_logger("flora.errors").exception(
+        "unhandled exception",
+        extra={"rid": rid, "path": getattr(request.url, "path", "-"),
+               "err": str(exc)[:200]},
+    )
+    return JSONResponse(
+        status_code=500,
+        content={
+            "ok": False,
+            "error": {
+                "code":    "internal_error",
+                "message": "Internal server error",
+                "details": {},
+            },
+            "_meta": {"request_id": rid},
+        },
+    )

@@ -11,11 +11,7 @@ from fastapi import APIRouter
 
 from backend.deps import PricesRepo_
 from backend.schemas.questions import Question
-from backend.services.presets import (
-    run_count_sku,
-    run_price_stats,
-    run_top_price_changes,
-)
+from backend.services.presets import run_preset
 
 router = APIRouter()
 
@@ -23,17 +19,4 @@ router = APIRouter()
 @router.post("/ask")
 def ask(q: Question, repo: PricesRepo_):
     preset = (getattr(q, "preset", None) or "").strip()
-
-    if preset == "count_sku":
-        return run_count_sku(repo)
-    if preset == "price_stats":
-        return run_price_stats(repo)
-    if preset == "top_price_changes":
-        return run_top_price_changes(repo)
-
-    return {
-        "ok": True,
-        "answer": "Выбери пресет или используй Smart (LLM) 🙂",
-        "sql": None,
-        "data": [],
-    }
+    return run_preset(preset, repo)

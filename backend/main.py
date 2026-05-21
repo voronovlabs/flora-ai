@@ -18,7 +18,7 @@ from __future__ import annotations
 from fastapi import FastAPI
 
 from backend.core.config import get_settings
-from backend.core.errors import FloraError, flora_error_handler
+from backend.core.errors import FloraError, flora_error_handler, unhandled_exception_handler
 from backend.core.logging import configure_logging, get_logger
 from backend.core.middleware import RequestIdMiddleware, TimingMiddleware
 from backend.routes import ask, health, smart, stats
@@ -36,13 +36,17 @@ app = FastAPI(
     openapi_url="/openapi.json",
 )
 
-# Middleware order matters: TimingMiddleware sees the latency including
-# RequestIdMiddleware, and RequestIdMiddleware sets the context var
-# before downstream handlers run.
+# Middleware: Starlette applies the LAST-ADDED first (outermost). We need
+# RequestIdMiddleware to be outermost so the contextvar is already set by
+# the time TimingMiddleware logs `rid=…`. The order below preserves that.
 app.add_middleware(TimingMiddleware)
 app.add_middleware(RequestIdMiddleware)
 
+# Typed application errors → structured JSON envelope.
 app.add_exception_handler(FloraError, flora_error_handler)
+# Anything that escapes a handler → 500 envelope carrying the request id,
+# instead of FastAPI's default "Internal Server Error" string.
+app.add_exception_handler(Exception, unhandled_exception_handler)
 
 app.include_router(health.router)
 app.include_router(stats.router)

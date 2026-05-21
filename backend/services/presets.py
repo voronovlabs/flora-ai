@@ -130,6 +130,30 @@ def run_price_stats(repo: Optional[PricesRepository] = None) -> Dict[str, Any]:
     return {"ok": True, "answer": "\n".join(lines), "sql": SQL_PRICE_STATS, "data": data}
 
 
+_NO_PRESET_RESPONSE: Dict[str, Any] = {
+    "ok": True,
+    "answer": "Выбери пресет или используй Smart (LLM) 🙂",
+    "sql": None,
+    "data": [],
+}
+
+
+def run_preset(name: str, repo: Optional[PricesRepository] = None) -> Dict[str, Any]:
+    """Dispatch ``name`` to the matching preset handler.
+
+    Single entry point so route handlers (``/ask``) and the ``/smart``
+    fallback path don't have to call each other through FastAPI's DI.
+    Returns the same legacy ``{ok, answer, sql, data}`` shape.
+    """
+    if name == "count_sku":
+        return run_count_sku(repo)
+    if name == "price_stats":
+        return run_price_stats(repo)
+    if name == "top_price_changes":
+        return run_top_price_changes(repo)
+    return dict(_NO_PRESET_RESPONSE)
+
+
 def run_top_price_changes(repo: Optional[PricesRepository] = None) -> Dict[str, Any]:
     repo = repo or PricesRepository()
     data = repo.top_price_changes()

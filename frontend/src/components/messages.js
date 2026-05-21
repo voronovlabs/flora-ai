@@ -3,7 +3,7 @@
 // append-only with status-driven re-render of the pending bubble — no
 // virtual DOM, no diffing libraries, no surprises.
 
-import { escapeHtml, formatTime } from '../format.js';
+import { escapeHtml, formatTimeFromTs } from '../format.js';
 import { store, select } from '../state/store.js';
 import { MessageRole, MessageStatus, MessageKind } from '../chat/types.js';
 
@@ -52,7 +52,9 @@ function bodyHtml(msg) {
   if (msg.status === MessageStatus.PENDING) return pendingBodyHtml();
   const main = `<div class="message-text">${escapeHtml(msg.text || '')}</div>`;
   const sql = msg.sql ? sqlBlockHtml(msg.sql, msg.id) : '';
-  const time = `<div class="message-time">${formatTime()}</div>`;
+  // Use the message's stored ts so the bubble's HH:MM is stable across
+  // unrelated re-renders (H1 fix).
+  const time = `<div class="message-time">${formatTimeFromTs(msg.ts)}</div>`;
   return main + sql + time;
 }
 
@@ -66,10 +68,18 @@ function renderMessageNode(msg) {
     ${avatarHtml(msg.role)}
     <div class="message-content">${bodyHtml(msg)}</div>
   `;
+  // Track the immutable message reference we last rendered. Because the
+  // reducer uses immutable updates, an identity check is enough to skip
+  // a no-op DOM rewrite during reconcile.
+  node._lastRef = msg;
   return node;
 }
 
 function updateMessageNode(node, msg) {
+  // Skip if the message reference didn't change. Prevents H1: timestamps
+  // on already-rendered bubbles drifting when unrelated messages mutate.
+  if (node._lastRef === msg) return;
+  node._lastRef = msg;
   // Status / kind may change between renders; reflect on dataset.
   node.dataset.role = msg.role;
   if (msg.kind === MessageKind.ERROR) node.dataset.error = '1';

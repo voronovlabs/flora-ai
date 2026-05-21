@@ -1,14 +1,18 @@
 # Local dev stack for Flora AI.
 #
-# Services
+# Services (default — `docker compose up`)
 #   postgres         — competitor price datamart (the `dm.comp_daily_prices`
 #                      table that backend /stats, /ask, /smart read from).
 #   flora-api        — analytics backend (FastAPI) at :8000.
-#   flora-agent-api  — parser/orchestration backend (FastAPI) at :8091.
-#                      Source lives in ./flora-agent-api and is unchanged.
 #   frontend         — nginx serving static index.html + src/ at :8080.
+#
+# Opt-in services (require `--profile <name>`)
+#   flora-agent-api  — parser/orchestration backend (FastAPI) at :8091.
+#                      Source lives in ./flora-agent-api which is NOT in this
+#                      repo (see .gitignore). Use `--profile agent` after you
+#                      check out the agent tree separately.
 #   caddy            — local reverse-proxy that mirrors prod routing.
-#                      Disabled by default; enable with `--profile proxy`.
+#                      Enable with `--profile proxy`.
 #
 # Production note: in real deploy Caddy is managed outside this compose file.
 # The `caddy` service here is just so `make up` reproduces prod routing.
@@ -40,6 +44,11 @@ services:
       - "8000:8000"
 
   flora-agent-api:
+    # Opt-in service. The ./flora-agent-api source tree is excluded from
+    # the repo (.gitignore) and tracked separately, so a fresh clone of
+    # flora-ai won't have its build context. To run it locally:
+    #   docker compose --profile agent up --build
+    profiles: ["agent"]
     build:
       context: ./flora-agent-api
     restart: unless-stopped

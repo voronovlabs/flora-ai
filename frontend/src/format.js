@@ -11,6 +11,14 @@ export function formatTime() {
   return now.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
 }
 
+// Format a stored timestamp (Date.now() ms epoch) into a stable, fixed-at-
+// creation HH:MM. Used by message bubbles so the timestamp doesn't drift
+// when other messages cause a re-render of the chat list.
+export function formatTimeFromTs(ts) {
+  const d = new Date(typeof ts === 'number' ? ts : Date.now());
+  return d.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
+}
+
 export function fmtDateISO(s) {
   // YYYY-MM-DD -> DD-MM-YYYY
   const m = /^([0-9]{4})-([0-9]{2})-([0-9]{2})$/.exec(String(s || ''));
