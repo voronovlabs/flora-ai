@@ -38,13 +38,25 @@ function shouldLog(level) {
 function tag(scope) { return `%c[${scope}]`; }
 const STYLE = 'color:#059669;font-weight:600';
 
+// Browser-compat: factory uses `arguments` + `.apply()` instead of
+// rest/spread so the file parses in older engines that don't accept
+// the `...` token.
+function makeLogMethod(scope, gate, consoleFn) {
+  return function () {
+    if (!gate()) return;
+    var args = Array.prototype.slice.call(arguments);
+    var prefix = [tag(scope), STYLE];
+    consoleFn.apply(console, prefix.concat(args));
+  };
+}
+
 export function createLogger(scope) {
   return {
-    trace: (...args) => shouldLog(LEVELS.TRACE) && console.debug(tag(scope), STYLE, ...args),
-    debug: (...args) => shouldLog(LEVELS.DEBUG) && console.debug(tag(scope), STYLE, ...args),
-    info:  (...args) => shouldLog(LEVELS.INFO)  && console.info(tag(scope), STYLE, ...args),
-    warn:  (...args) => shouldLog(LEVELS.WARN)  && console.warn(tag(scope), STYLE, ...args),
-    error: (...args) => shouldLog(LEVELS.ERROR) && console.error(tag(scope), STYLE, ...args),
+    trace: makeLogMethod(scope, function () { return shouldLog(LEVELS.TRACE); }, console.debug),
+    debug: makeLogMethod(scope, function () { return shouldLog(LEVELS.DEBUG); }, console.debug),
+    info:  makeLogMethod(scope, function () { return shouldLog(LEVELS.INFO);  }, console.info),
+    warn:  makeLogMethod(scope, function () { return shouldLog(LEVELS.WARN);  }, console.warn),
+    error: makeLogMethod(scope, function () { return shouldLog(LEVELS.ERROR); }, console.error),
   };
 }
 

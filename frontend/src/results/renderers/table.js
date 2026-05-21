@@ -62,7 +62,9 @@ export const tableRenderer = {
     rows.forEach((r) => Object.keys(r).forEach((k) => keysSet.add(k)));
     const pref = PREFERRED_ORDER.filter((k) => keysSet.has(k));
     const rest = Array.from(keysSet).filter((k) => !PREFERRED_ORDER.includes(k));
-    const keys = [...pref, ...rest];
+    // Browser-compat: array spread replaced with concat() so the file
+    // parses in older engines that don't accept the `...` token.
+    const keys = pref.concat(rest);
 
     const thead = `<thead><tr>${keys.map((k) => `<th>${HEADER_MAP[k] || k}</th>`).join('')}</tr></thead>`;
     const tbody = `<tbody>${rows.map((row) => {
