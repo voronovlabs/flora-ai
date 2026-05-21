@@ -9,7 +9,11 @@
 //   • no changes to the renderer contract or ChatEngine,
 //   • backend / API shapes are untouched.
 
-import { askPreset, getStats } from '../api.js';
+// We deliberately do NOT import getStats here — /stats is already
+// fetched once by app.js boot and stored under `state.stats`. This
+// module subscribes to that slice to avoid a duplicate HTTP request.
+import { askPreset } from '../api.js';
+import { store, select } from '../state/store.js';
 import { escapeHtml, fmtInt, fmtMoney, fmtDateISO } from '../format.js';
 
 let host = null;
@@ -163,24 +167,36 @@ function setMeta(text) {
   if (m) m.textContent = text;
 }
 
-function bootstrap() {
-  // KPI: total SKU + competitors + snapshot from /stats; min/avg/max from price_stats.
-  getStats().then(function (s) {
-    if (!s || !s.ok) { setMeta('нет данных'); return; }
-    setKpi(0, fmtInt(s.total_sku || 0));
-    setKpi(1, fmtInt((s.sources || []).length));
-    setKpi(5, s.snapshot_date ? fmtDateISO(s.snapshot_date) : '—');
-    if (s.snapshot_date) setMeta('обновлено ' + fmtDateISO(s.snapshot_date));
+// KPI fields that depend on /stats (total SKU / competitors / snapshot
+// date / leader insight). Pulled from the store so we make zero extra
+// HTTP requests — app.js already fetched /stats once at boot.
+function applyStatsSlice(stats) {
+  if (!stats || !stats.loaded) {
+    setMeta('обновляется…');
+    return;
+  }
+  setKpi(0, fmtInt(stats.total_sku || 0));
+  setKpi(1, fmtInt((stats.sources || []).length));
+  setKpi(5, stats.snapshot_date ? fmtDateISO(stats.snapshot_date) : '—');
+  if (stats.snapshot_date) setMeta('обновлено ' + fmtDateISO(stats.snapshot_date));
 
-    // Leader insight straight from /stats.
-    const sources = (s.sources || []).slice().sort(function (a, b) {
-      return (b.sku_count || 0) - (a.sku_count || 0);
-    });
-    if (sources.length > 0) {
-      const leader = sources[0];
-      setInsight(0, escapeHtml(String(leader.source)), fmtInt(leader.sku_count) + ' позиций');
-    }
-  }).catch(function () { setMeta('ошибка загрузки'); });
+  const sources = (stats.sources || []).slice().sort(function (a, b) {
+    return (b.sku_count || 0) - (a.sku_count || 0);
+  });
+  if (sources.length > 0) {
+    const leader = sources[0];
+    setInsight(0, escapeHtml(String(leader.source)), fmtInt(leader.sku_count) + ' позиций');
+  }
+}
+
+function bootstrap() {
+  // 1. KPI: total SKU + competitors + snapshot + leader insight come
+  //    from store.stats. We apply the current snapshot synchronously
+  //    (covers the case where mountDashboardTop runs after STATS_LOADED
+  //    has already been dispatched) and then subscribe for future
+  //    updates.
+  applyStatsSlice(select.stats(store.getState()));
+  store.subscribeSlice(select.stats, applyStatsSlice);
 
   // Market-wide pricing.
   askPreset('price_stats').then(function (r) {

@@ -17,6 +17,12 @@ registerRenderer('insight', insightRenderer);
 let panelEl = null;
 let contentEl = null;
 let overlayEl = null;
+// Mobile-only auto-open is a courtesy on the FIRST dataset arrival.
+// After that, the user is in control: any manual close (mobile tab,
+// overlay tap, ✕ button) sticks, and subsequent results don't override
+// their decision.
+let autoOpenedOnce = false;
+let prevPanelOpen = false;
 
 function repaint() {
   if (!contentEl) return;
@@ -48,15 +54,27 @@ export function mountResultsPanel({ panel, content, overlay }) {
 
   repaint();
   syncPanelClasses();
+  prevPanelOpen = select.panelOpen(store.getState());
 
   store.subscribeSlice(select.results, repaint);
-  store.subscribeSlice(select.panelOpen, syncPanelClasses);
+  store.subscribeSlice(select.panelOpen, (open) => {
+    syncPanelClasses();
+    // Detect a manual close: panel goes from open → closed. Once that
+    // happens we permanently disable the courtesy auto-open below so
+    // the panel doesn't keep popping back on every new dataset.
+    if (prevPanelOpen && !open) autoOpenedOnce = true;
+    prevPanelOpen = open;
+  });
 
-  // Auto-open on first dataset arrival on mobile, preserving legacy UX.
+  // Auto-open on first dataset arrival on mobile, ONCE. After the user
+  // has either closed the panel manually or the courtesy has fired,
+  // `autoOpenedOnce` is true and we leave the panel state alone.
   store.subscribeSlice(select.resultsData, (data, prev) => {
+    if (autoOpenedOnce) return;
     const hadData = Array.isArray(prev) && prev.length > 0;
     const hasData = Array.isArray(data) && data.length > 0;
     if (!hadData && hasData && window.innerWidth <= 1024) {
+      autoOpenedOnce = true;
       store.dispatch(setPanelOpen(true));
     }
   });
