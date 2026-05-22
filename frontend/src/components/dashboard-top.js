@@ -56,16 +56,20 @@ function kpiCardHtml(label, value, hint, opts) {
   );
 }
 
-function insightCardHtml(icon, title, value, hint) {
+// Insight cards are clickable: each one routes through the existing
+// data-action delegation in app.js, no new handlers needed.
+//   data-action="smart-question" data-question="…" → ChatEngine.sendSmart
+//   data-action="preset"         data-preset="…"   → ChatEngine.sendPreset
+function insightCardHtml(icon, title, value, hint, dataAttrs) {
   return (
-    '<div class="insight-card">' +
+    '<button type="button" class="insight-card" ' + (dataAttrs || '') + '>' +
       '<div class="insight-card__icon">' + icon + '</div>' +
       '<div class="insight-card__body">' +
         '<div class="insight-card__title">' + escapeHtml(title) + '</div>' +
         '<div class="insight-card__value">' + (value || '') + '</div>' +
         (hint ? '<div class="insight-card__hint">' + escapeHtml(hint) + '</div>' : '') +
       '</div>' +
-    '</div>'
+    '</button>'
   );
 }
 
@@ -105,10 +109,14 @@ function renderShell() {
         '<span class="section-meta">сгенерировано из живых данных</span>' +
       '</header>' +
       '<div class="insights-grid" id="insightsGrid">' +
-        insightCardHtml('🌸', 'Лидер по ассортименту', '<span class="placeholder">—</span>', '') +
-        insightCardHtml('🏆', 'Самый дорогой букет',    '<span class="placeholder">—</span>', '') +
-        insightCardHtml('📉', 'Максимальное падение',   '<span class="placeholder">—</span>', '') +
-        insightCardHtml('📈', 'Максимальный рост',      '<span class="placeholder">—</span>', '') +
+        insightCardHtml('🌸', 'Лидер по ассортименту', '<span class="placeholder">—</span>', '',
+          'data-action="smart-question" data-question="Кто лидер рынка по ассортименту?"') +
+        insightCardHtml('🏆', 'Самый дорогой букет',   '<span class="placeholder">—</span>', '',
+          'data-action="smart-question" data-question="Покажи самый дорогой букет и магазин"') +
+        insightCardHtml('📉', 'Максимальное падение',  '<span class="placeholder">—</span>', '',
+          'data-action="preset" data-preset="top_price_changes"') +
+        insightCardHtml('📈', 'Максимальный рост',     '<span class="placeholder">—</span>', '',
+          'data-action="preset" data-preset="top_price_changes"') +
       '</div>' +
     '</section>' +
 

@@ -57,7 +57,7 @@
   --header-h:       64px;
   --maxw:           1400px;
   --gutter:         24px;
-  --col-right:      clamp(420px, 35vw, 620px);
+  --col-right:      clamp(390px, 30vw, 520px);
 }
 
 html, body { height: 100%; }
@@ -153,7 +153,9 @@ body {
   margin: 0 auto;
   padding: 24px var(--gutter) 32px;
   display: grid;
-  grid-template-columns: minmax(600px, 1fr) var(--col-right);
+  /* Give the workspace more breathing room so 6 KPI cards fit without
+     clipping numbers; right analytics panel is still usable. */
+  grid-template-columns: minmax(760px, 1fr) var(--col-right);
   gap: 24px;
   align-items: start;
 }
@@ -197,53 +199,56 @@ body {
 /* KPI cards */
 .kpi-grid {
   display: grid;
-  grid-template-columns: repeat(6, minmax(0, 1fr));
-  gap: 12px;
+  /* Adaptive: fits as many columns as room allows; cards never get
+     narrower than 150px so long numbers (7 000 455 ₽) stay readable. */
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 10px;
 }
 .kpi-card {
   background: var(--bg-surface);
   border: 1px solid var(--border);
   border-radius: var(--r-md);
-  padding: 14px 14px 12px;
+  padding: 12px 14px 12px;
   box-shadow: var(--shadow-xs);
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 4px;
   min-width: 0;
   transition: transform 0.12s ease, box-shadow 0.15s ease, border-color 0.15s;
 }
 .kpi-card:hover { transform: translateY(-1px); box-shadow: var(--shadow-md); border-color: var(--border-strong); }
 .kpi-card__head { display: flex; align-items: center; gap: 8px; }
 .kpi-card__icon {
-  width: 26px; height: 26px;
+  width: 24px; height: 24px;
   display: grid; place-items: center;
   border-radius: 8px;
   background: var(--bg-tertiary);
-  font-size: 14px;
+  font-size: 13px;
 }
 .kpi-card__label {
-  font-size: 11.5px;
+  font-size: 11px;
   font-weight: 500;
   color: var(--text-tertiary);
   letter-spacing: 0.04em;
   text-transform: uppercase;
 }
 .kpi-card__value {
-  font-size: 24px;
+  /* Auto-shrinks on narrower cards but never clips — the whole number
+     is always visible. */
+  font-size: clamp(17px, 1.6vw, 23px);
   font-weight: 700;
   letter-spacing: -0.02em;
   color: var(--text-primary);
-  line-height: 1.05;
+  line-height: 1.1;
   white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  /* No overflow:hidden / text-overflow:ellipsis — values must show in
+     full (e.g. "7 000 455 ₽", "17-05-2026"). */
 }
 .kpi-card__hint {
-  font-size: 12px;
+  font-size: 11.5px;
   color: var(--text-secondary);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  line-height: 1.35;
+  /* No nowrap — hints may wrap to a second line if needed. */
 }
 .kpi-card.tone-up   .kpi-card__icon { background: var(--up-soft); color: var(--up); }
 .kpi-card.tone-down .kpi-card__icon { background: var(--down-soft); color: var(--down); }
@@ -255,30 +260,43 @@ body {
 }
 @keyframes shimmer { 0%{background-position:200% 0} 100%{background-position:-200% 0} }
 
-/* Insight cards */
+/* Insight cards — now <button>, must reset native button styling. */
 .insights-grid {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 12px;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 10px;
 }
 .insight-card {
+  appearance: none;
+  -webkit-appearance: none;
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+  width: 100%;
   background: var(--bg-surface);
   border: 1px solid var(--border);
   border-radius: var(--r-md);
-  padding: 14px;
+  padding: 12px 14px;
   display: flex;
   gap: 12px;
+  align-items: center;
   box-shadow: var(--shadow-xs);
   min-width: 0;
   transition: transform 0.12s ease, box-shadow 0.15s, border-color 0.15s;
 }
-.insight-card:hover { transform: translateY(-1px); box-shadow: var(--shadow-md); border-color: var(--border-strong); }
+.insight-card:hover  { transform: translateY(-1px); box-shadow: var(--shadow-md); border-color: var(--border-strong); }
+.insight-card:active { transform: translateY(0); }
+.insight-card:focus-visible {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-50);
+}
 .insight-card__icon {
-  width: 34px; height: 34px; flex-shrink: 0;
+  width: 32px; height: 32px; flex-shrink: 0;
   display: grid; place-items: center;
   border-radius: 10px;
   background: linear-gradient(135deg, var(--info-soft), #fff);
-  font-size: 18px;
+  font-size: 17px;
 }
 .insight-card__body { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .insight-card__title {
@@ -289,39 +307,38 @@ body {
   text-transform: uppercase;
 }
 .insight-card__value {
-  font-size: 18px;
+  font-size: 17px;
   font-weight: 700;
   letter-spacing: -0.01em;
   color: var(--text-primary);
+  /* Numbers must show in full — no nowrap/ellipsis clipping. */
   white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
 .insight-card__hint {
-  font-size: 12.5px;
+  font-size: 12px;
   color: var(--text-secondary);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  line-height: 1.35;
 }
 
 /* Action cards */
 .actions-grid {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 12px;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 10px;
 }
 .action-card {
   appearance: none;
+  -webkit-appearance: none;
+  font-family: inherit;
   text-align: left;
   background: var(--bg-surface);
   border: 1px solid var(--border);
   border-radius: var(--r-md);
-  padding: 14px 14px 16px;
+  padding: 12px 14px 12px;
   cursor: pointer;
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 2px;
   min-width: 0;
   position: relative;
   overflow: hidden;
@@ -342,19 +359,26 @@ body {
   box-shadow: var(--shadow-md);
 }
 .action-card:hover::before { opacity: 1; }
+.action-card:focus-visible {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-50);
+}
 .action-card__icon {
-  font-size: 22px;
-  margin-bottom: 4px;
+  font-size: 18px;
+  margin-bottom: 2px;
+  line-height: 1;
 }
 .action-card__title {
-  font-size: 14px;
+  font-size: 13.5px;
   font-weight: 600;
   color: var(--text-primary);
   letter-spacing: -0.005em;
 }
 .action-card__subtitle {
-  font-size: 12.5px;
+  font-size: 12px;
   color: var(--text-secondary);
+  line-height: 1.35;
 }
 
 /* ─────────── chat ─────────── */
@@ -364,46 +388,39 @@ body {
   border: 1px solid var(--border);
   border-radius: var(--r-lg);
   box-shadow: var(--shadow-sm);
-  min-height: 320px;
+  min-height: 240px;
   display: flex;
   flex-direction: column;
   overflow: hidden;
 }
 .chat-messages {
-  padding: 24px;
+  padding: 18px 20px;
   display: flex;
   flex-direction: column;
-  gap: 20px;
-  max-height: calc(100vh - 280px);
+  gap: 16px;
+  max-height: calc(100vh - 240px);
   overflow-y: auto;
 }
 
+/* Compact welcome — no halo, left-aligned, product-y headline. */
 .welcome-message {
   position: relative;
-  text-align: center;
-  padding: 36px 24px 28px;
+  padding: 6px 4px 4px;
 }
-.welcome-message__halo {
-  position: absolute;
-  inset: 0;
-  background: radial-gradient(360px 180px at 50% 30%, var(--accent-50), transparent 70%);
-  z-index: 0;
-  pointer-events: none;
-}
+.welcome-message__halo { display: none; }
 .welcome-message__title {
   position: relative;
-  font-size: 24px;
+  font-size: 17px;
   font-weight: 700;
-  letter-spacing: -0.02em;
-  margin-bottom: 8px;
+  letter-spacing: -0.015em;
+  margin-bottom: 4px;
 }
 .welcome-message__subtitle {
   position: relative;
-  font-size: 14.5px;
+  font-size: 13.5px;
   color: var(--text-secondary);
-  line-height: 1.55;
-  max-width: 520px;
-  margin: 0 auto;
+  line-height: 1.5;
+  max-width: 640px;
 }
 
 /* message bubbles */
@@ -587,7 +604,7 @@ body {
   flex-direction: column;
 }
 .panel-card__head {
-  padding: 14px 16px;
+  padding: 12px 14px;
   display: flex;
   align-items: center;
   gap: 10px;
@@ -606,8 +623,8 @@ body {
   letter-spacing: -0.005em;
 }
 .panel-card__actions { margin-left: auto; display: flex; gap: 6px; }
-.panel-card__body { padding: 16px; font-size: 13.5px; color: var(--text-secondary); line-height: 1.55; }
-.panel-card__body--scroll { max-height: 540px; overflow-y: auto; }
+.panel-card__body { padding: 12px 14px; font-size: 13.5px; color: var(--text-secondary); line-height: 1.5; }
+.panel-card__body--scroll { max-height: calc(100vh - var(--header-h) - 280px); min-height: 240px; overflow-y: auto; }
 
 /* sources box inside panel */
 #statsBox strong { color: var(--text-primary); font-weight: 600; }
@@ -698,19 +715,14 @@ body {
 
 /* ─────────── responsive ─────────── */
 
-/* tablet */
-@media (max-width: 1180px) {
-  .kpi-grid     { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-  .insights-grid{ grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .actions-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-}
-
 /* mobile (single column + tabs) */
 @media (max-width: 1024px) {
   .app-shell {
     grid-template-columns: 1fr;
     gap: 16px;
-    padding: 16px var(--gutter) 96px;
+    /* extra bottom padding so the fixed mobile composer never overlaps
+       the last chat bubble. */
+    padding: 16px var(--gutter) 120px;
   }
 
   .analytics-panel {
@@ -725,17 +737,28 @@ body {
     background: var(--bg-app);
     padding: 16px;
     box-shadow: var(--shadow-lg);
+    max-height: none;
   }
   .analytics-panel.open { right: 0; }
 
-  /* When mobile-tab=results is active we instead want the panel inline */
+  /* Mobile-tab=results hides chat + composer */
   .workspace[data-active-tab="results"] .chat-area,
   .workspace[data-active-tab="results"] .composer { display: none; }
 
   .mobile-tabs { display: inline-flex; }
 
   .chat-messages { max-height: none; }
-  .composer { position: sticky; bottom: 12px; }
+
+  /* Composer fixed to viewport bottom on mobile so it never gets pushed
+     off-screen by sticky-in-overflow weirdness. */
+  .composer {
+    position: fixed;
+    left: 16px;
+    right: 16px;
+    bottom: 16px;
+    z-index: 30;
+    box-shadow: var(--shadow-lg);
+  }
 }
 
 /* small mobile */
@@ -744,15 +767,17 @@ body {
   .app-header__inner { gap: 12px; padding: 0 16px; }
   .header-nav { display: none; }
 
+  /* Force the 6 KPI cards into a 2-column grid on small phones */
   .kpi-grid     { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
   .insights-grid{ grid-template-columns: 1fr; }
   .actions-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 
-  .kpi-card     { padding: 12px; }
-  .kpi-card__value { font-size: 22px; }
+  .kpi-card     { padding: 10px 12px; }
+  .kpi-card__value { font-size: 20px; }
 
-  .welcome-message { padding: 24px 16px 16px; }
-  .welcome-message__title { font-size: 20px; }
+  .welcome-message { padding: 4px 4px 6px; }
+  .welcome-message__title    { font-size: 16px; }
+  .welcome-message__subtitle { font-size: 13px; }
 
-  .composer { bottom: 8px; }
+  .composer { left: 12px; right: 12px; bottom: 12px; }
 }
