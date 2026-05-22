@@ -18,6 +18,8 @@ import { mountResultsPanel, downloadCsv } from './components/results-panel.js';
 import { mountStatsBox } from './components/stats-box.js';
 import { mountDashboardTop } from './components/dashboard-top.js';
 import { mountTabs, setTab } from './components/tabs.js';
+import { mountHero } from './components/hero.js';
+import { mountHeaderStatus } from './components/header-status.js';
 import { isDebugMode } from './core/logger.js';
 
 function $(id) { return document.getElementById(id); }
@@ -152,6 +154,8 @@ function boot() {
   // action-cards / send-button still respond.
   safe('bindEventDelegation', bindEventDelegation);
   safe('setDebug',            function () { store.dispatch(setDebug(isDebugMode())); });
+  safe('mountHeaderStatus',   function () { mountHeaderStatus($('headerStatus')); });
+  safe('mountHero',           function () { mountHero($('hero')); });
   safe('mountDashboardTop',   function () { mountDashboardTop($('dashboardTop')); });
   safe('mountTabs',           function () { mountTabs($('mobileTabs')); });
   safe('mountMessages',       function () { mountMessages($('chatMessages')); });

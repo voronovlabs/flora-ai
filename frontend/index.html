@@ -26,6 +26,13 @@
         <button class="nav-btn">Настройки</button>
       </nav>
       <div class="header-side">
+        <div class="header-status" id="headerStatus" data-state="boot">
+          <span class="header-status__dot"></span>
+          <span class="header-status__text">
+            <span class="header-status__primary">Подключение…</span>
+            <span class="header-status__secondary">Postgres</span>
+          </span>
+        </div>
         <button class="icon-btn icon-btn--ghost" aria-label="User menu" title="Профиль">👤</button>
       </div>
     </div>
@@ -33,71 +40,94 @@
 
   <main class="app-shell">
 
-    <!-- LEFT: workspace = dashboard + chat + composer -->
+    <!-- LEFT: workspace = hero / dashboard / chat -->
     <section class="workspace">
 
-      <!-- KPI · Insights · Action cards -->
-      <div class="dashboard-top" id="dashboardTop">
-        <!-- rendered by components/dashboard-top.js -->
-      </div>
+      <!-- HERO · command center -->
+      <section class="hero" id="hero">
+        <div class="hero__decor" aria-hidden="true"></div>
+        <div class="hero__head">
+          <span class="hero__pill">Flora AI · Market Intelligence</span>
+          <h1 class="hero__title">Flora AI анализирует рынок цветов за вас</h1>
+          <p class="hero__subtitle">
+            Цены, ассортимент, конкуренты и изменения — в одном AI-интерфейсе.
+          </p>
+        </div>
 
-      <!-- Mobile tab switcher (hidden on desktop) -->
+        <!-- Composer (embedded into hero, no longer at workspace bottom) -->
+        <div class="composer hero__composer">
+          <div class="composer__inner">
+            <textarea
+              class="composer__input"
+              id="messageInput"
+              placeholder="Спросите о ценах, ассортименте, конкурентах…"
+              rows="1"
+              data-input="message"
+            ></textarea>
+            <button class="composer__send" id="sendBtn" data-action="send-message" aria-label="Отправить">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                   stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <line x1="22" y1="2" x2="11" y2="13"></line>
+                <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+              </svg>
+            </button>
+          </div>
+          <div class="composer__hint">⏎ — отправить · Shift+⏎ — перенос строки</div>
+        </div>
+
+        <!-- Live status chips driven by store.stats -->
+        <div class="hero__chips" id="heroChips">
+          <span class="hero-chip" data-chip="sku">
+            <span class="hero-chip__icon">📦</span>
+            <span class="hero-chip__value">—</span>
+            <span class="hero-chip__label">SKU</span>
+          </span>
+          <span class="hero-chip" data-chip="competitors">
+            <span class="hero-chip__icon">🏪</span>
+            <span class="hero-chip__value">—</span>
+            <span class="hero-chip__label">конкурентов</span>
+          </span>
+          <span class="hero-chip" data-chip="snapshot">
+            <span class="hero-chip__icon">🗓</span>
+            <span class="hero-chip__value">—</span>
+            <span class="hero-chip__label">обновлено</span>
+          </span>
+        </div>
+      </section>
+
+      <!-- Mobile tab switcher -->
       <nav class="mobile-tabs" id="mobileTabs" data-active-tab="chat">
         <button class="mobile-tabs__btn is-active" data-action="tab" data-tab="chat">💬 Чат</button>
         <button class="mobile-tabs__btn" data-action="tab" data-tab="results">📊 Результаты</button>
       </nav>
 
-      <!-- Chat -->
-      <section class="chat-area">
-        <div class="chat-messages" id="chatMessages">
-          <div class="welcome-message">
-            <div class="welcome-message__halo"></div>
-            <h1 class="welcome-message__title">Рынок цветов: цены, ассортимент и изменения конкурентов</h1>
-            <p class="welcome-message__subtitle">
-              Задайте вопрос или выберите быстрый сценарий — Flora AI соберёт аналитику по
-              конкурентам и покажет результаты справа.
-            </p>
-          </div>
-        </div>
-      </section>
+      <!-- KPI · Insights · Action cards -->
+      <div class="dashboard-top" id="dashboardTop"></div>
 
-      <!-- Composer (sticky bottom of workspace) -->
-      <div class="composer">
-        <div class="composer__inner">
-          <textarea
-            class="composer__input"
-            id="messageInput"
-            placeholder="Спросите о ценах, ассортименте, конкурентах…"
-            rows="1"
-            data-input="message"
-          ></textarea>
-          <button class="composer__send" id="sendBtn" data-action="send-message" aria-label="Отправить">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                 stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <line x1="22" y1="2" x2="11" y2="13"></line>
-              <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
-            </svg>
-          </button>
-        </div>
-        <div class="composer__hint">⏎ — отправить · Shift+⏎ — перенос строки</div>
-      </div>
+      <!-- Chat: hidden via CSS while #chatMessages is :empty -->
+      <section class="chat-area">
+        <div class="chat-messages" id="chatMessages"></div>
+      </section>
 
     </section>
 
     <!-- RIGHT: analytics panel (sticky) -->
     <aside class="analytics-panel" id="resultsPanel">
 
-      <article class="panel-card panel-card--sources">
+      <article class="panel-card panel-card--coverage">
         <header class="panel-card__head">
-          <span class="panel-card__dot"></span>
-          <h3 class="panel-card__title">Источники данных</h3>
+          <span class="panel-card__dot panel-card__dot--accent"></span>
+          <h3 class="panel-card__title">Live data coverage</h3>
+          <span class="panel-card__meta" id="coverageMeta">—</span>
         </header>
-        <div class="panel-card__body" id="statsBox">Загружаю статистику…</div>
+        <div class="panel-card__body" id="statsBox">
+          <div class="coverage-skeleton">Загружаю покрытие…</div>
+        </div>
       </article>
 
       <article class="panel-card panel-card--results">
         <header class="panel-card__head">
-          <span class="panel-card__dot panel-card__dot--accent"></span>
+          <span class="panel-card__dot"></span>
           <h3 class="panel-card__title">Результаты запроса</h3>
           <div class="panel-card__actions">
             <button class="icon-btn" data-action="download-csv" title="Скачать CSV" aria-label="Скачать CSV">
@@ -111,9 +141,31 @@
           </div>
         </header>
         <div class="panel-card__body panel-card__body--scroll" id="resultsContent">
-          <div class="empty-state">
-            <div class="empty-state__icon">📊</div>
-            <div class="empty-state__text">Здесь будут отображаться результаты ваших запросов</div>
+          <div class="empty-state empty-state--rich">
+            <div class="empty-state__art" aria-hidden="true">
+              <svg viewBox="0 0 90 64" xmlns="http://www.w3.org/2000/svg">
+                <defs>
+                  <linearGradient id="es-grad" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stop-color="#10b981" stop-opacity="0.55"/>
+                    <stop offset="100%" stop-color="#10b981" stop-opacity="0.05"/>
+                  </linearGradient>
+                </defs>
+                <rect x="6"  y="34" width="10" height="22" rx="2" fill="url(#es-grad)"/>
+                <rect x="22" y="22" width="10" height="34" rx="2" fill="url(#es-grad)"/>
+                <rect x="38" y="14" width="10" height="42" rx="2" fill="url(#es-grad)"/>
+                <rect x="54" y="26" width="10" height="30" rx="2" fill="url(#es-grad)"/>
+                <rect x="70" y="18" width="10" height="38" rx="2" fill="url(#es-grad)"/>
+                <path d="M6 48 L22 36 L38 26 L54 32 L70 22 L84 28"
+                      stroke="#059669" stroke-width="2" fill="none"
+                      stroke-linecap="round" stroke-linejoin="round"/>
+                <circle cx="54" cy="32" r="3" fill="#059669"/>
+                <circle cx="38" cy="26" r="3" fill="#059669"/>
+              </svg>
+            </div>
+            <div class="empty-state__text">
+              <strong>Здесь появятся ваши результаты</strong>
+              <span>Выберите сценарий слева, чтобы увидеть таблицу, SQL и вывод AI.</span>
+            </div>
           </div>
         </div>
       </article>
