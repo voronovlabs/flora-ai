@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Flora AI — рыночная аналитика для цветочного бизнеса</title>
+  <title>Flora AI — аналитика цветочного рынка</title>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/src/styles.css">
   <base target="_blank">
@@ -17,12 +17,12 @@
         <div class="brand__mark">🌿</div>
         <div class="brand__name">
           <span class="brand__name-row">Flora<span class="brand__name-accent">AI</span></span>
-          <span class="brand__tag">Рыночная аналитика</span>
+          <span class="brand__tag">Аналитика цветочного рынка</span>
         </div>
       </div>
       <nav class="header-nav">
         <button class="nav-btn nav-btn--active">Диалог</button>
-        <button class="nav-btn">Отчёты</button>
+        <button class="nav-btn">История</button>
         <button class="nav-btn">Настройки</button>
       </nav>
       <div class="header-side">
@@ -47,10 +47,11 @@
       <section class="hero" id="hero">
         <div class="hero__decor" aria-hidden="true"></div>
         <div class="hero__head">
-          <span class="hero__pill">Flora AI · Рыночная аналитика</span>
+          <span class="hero__pill">Flora AI · Аналитика цветочного рынка</span>
           <h1 class="hero__title">Ваш AI-аналитик цветочного рынка</h1>
           <p class="hero__subtitle">
-            Цены конкурентов, ассортимент, изменения рынка и рекомендации по действиям.
+            Отслеживайте цены конкурентов, находите изменения ассортимента
+            и принимайте решения на основе данных рынка.
           </p>
         </div>
 
@@ -117,18 +118,18 @@
       <article class="panel-card panel-card--coverage">
         <header class="panel-card__head">
           <span class="panel-card__dot panel-card__dot--accent"></span>
-          <h3 class="panel-card__title">Покрытие данных</h3>
+          <h3 class="panel-card__title">Подключённые магазины</h3>
           <span class="panel-card__meta" id="coverageMeta">—</span>
         </header>
         <div class="panel-card__body" id="statsBox">
-          <div class="coverage-skeleton">Загружаю покрытие…</div>
+          <div class="coverage-skeleton">Подключаемся…</div>
         </div>
       </article>
 
       <article class="panel-card panel-card--results">
         <header class="panel-card__head">
           <span class="panel-card__dot"></span>
-          <h3 class="panel-card__title">Результаты запроса</h3>
+          <h3 class="panel-card__title">Результаты</h3>
           <div class="panel-card__actions">
             <button class="icon-btn" data-action="download-csv" title="Скачать CSV" aria-label="Скачать CSV">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -143,32 +144,24 @@
         <!-- Динамическая сводка над таблицей (results-summary.js) -->
         <div class="results-summary" id="resultsSummary" hidden></div>
         <div class="panel-card__body panel-card__body--scroll" id="resultsContent">
-          <div class="empty-state empty-state--rich">
-            <div class="empty-state__art" aria-hidden="true">
-              <svg viewBox="0 0 90 64" xmlns="http://www.w3.org/2000/svg">
-                <defs>
-                  <linearGradient id="es-grad" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stop-color="#10b981" stop-opacity="0.55"/>
-                    <stop offset="100%" stop-color="#10b981" stop-opacity="0.05"/>
-                  </linearGradient>
-                </defs>
-                <rect x="6"  y="34" width="10" height="22" rx="2" fill="url(#es-grad)"/>
-                <rect x="22" y="22" width="10" height="34" rx="2" fill="url(#es-grad)"/>
-                <rect x="38" y="14" width="10" height="42" rx="2" fill="url(#es-grad)"/>
-                <rect x="54" y="26" width="10" height="30" rx="2" fill="url(#es-grad)"/>
-                <rect x="70" y="18" width="10" height="38" rx="2" fill="url(#es-grad)"/>
-                <path d="M6 48 L22 36 L38 26 L54 32 L70 22 L84 28"
-                      stroke="#059669" stroke-width="2" fill="none"
-                      stroke-linecap="round" stroke-linejoin="round"/>
-                <circle cx="54" cy="32" r="3" fill="#059669"/>
-                <circle cx="38" cy="26" r="3" fill="#059669"/>
-              </svg>
-            </div>
-            <div class="empty-state__text">
-              <strong>Здесь появятся ваши результаты</strong>
-              <span>Выберите сценарий слева, чтобы увидеть таблицу, SQL и вывод AI.</span>
-            </div>
-          </div>
+          <!-- Pre-query intro. Перезаписывается tableRenderer'ом при первом ответе. -->
+          <section class="results-intro">
+            <header class="results-intro__head">
+              <span class="results-intro__icon">✨</span>
+              <h4 class="results-intro__title">Что умеет Flora AI</h4>
+            </header>
+            <ul class="results-intro__list">
+              <li>Кто лидер рынка по ассортименту</li>
+              <li>Где самые низкие цены</li>
+              <li>Какие товары дорожают</li>
+              <li>Какие товары дешевеют</li>
+              <li>Как меняется рынок</li>
+            </ul>
+            <p class="results-intro__footer">
+              Попробуйте один из сценариев слева или задайте собственный
+              вопрос в диалоге.
+            </p>
+          </section>
         </div>
       </article>
 

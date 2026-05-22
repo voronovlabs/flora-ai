@@ -373,39 +373,27 @@ body {
 }
 .insight-card__top { display: flex; align-items: center; gap: 8px; }
 .insight-card__icon {
-  width: 28px; height: 28px;
+  width: 32px; height: 32px;
   display: grid; place-items: center;
-  border-radius: 8px;
-  background: linear-gradient(135deg, var(--info-soft), #fff);
-  font-size: 15px;
+  border-radius: 10px;
+  background: linear-gradient(135deg, var(--accent-50), #fff);
+  font-size: 17px;
+  border: 1px solid var(--accent-soft);
 }
-.insight-card__badge {
-  margin-left: auto;
-  font-size: 10px; font-weight: 700;
-  letter-spacing: 0.06em; text-transform: uppercase;
-  padding: 3px 10px;
-  border-radius: 999px;
-  background: var(--neutral-soft);
-  color: var(--text-secondary);
-  white-space: nowrap;
-}
-.insight-card__badge--opportunity { background: var(--accent-50);    color: var(--accent-hover); }
-.insight-card__badge--risk        { background: var(--down-soft);    color: #b91c1c; }
-.insight-card__badge--leader      { background: var(--warning-soft); color: #b45309; }
-.insight-card__badge--benchmark   { background: var(--info-soft);    color: #4338ca; }
 
 .insight-card__title {
-  font-size: 11px; font-weight: 700;
-  color: var(--text-tertiary);
-  letter-spacing: 0.06em; text-transform: uppercase;
+  font-size: 13.5px; font-weight: 600;
+  color: var(--text-primary);
+  letter-spacing: -0.005em;
+  line-height: 1.3;
   margin-top: 2px;
 }
 .insight-card__value {
-  font-size: 19px; font-weight: 700;
-  letter-spacing: -0.015em;
+  font-size: 22px; font-weight: 700;
+  letter-spacing: -0.02em;
   color: var(--text-primary);
   white-space: nowrap;
-  line-height: 1.15;
+  line-height: 1.1;
   font-variant-numeric: tabular-nums;
 }
 .insight-card__hint {
@@ -417,6 +405,13 @@ body {
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
+}
+.insight-card__note {
+  font-size: 12.5px;
+  color: var(--text-tertiary);
+  line-height: 1.45;
+  margin-top: 2px;
+  font-style: normal;
 }
 
 .insight-card__cta {
@@ -692,23 +687,58 @@ body {
 .results-summary__sep  { color: var(--text-tertiary); }
 .results-summary__date { color: var(--text-tertiary); }
 
-/* Rich empty state */
-.empty-state--rich {
-  display: flex; flex-direction: column; align-items: center;
+/* Results intro — shown in #resultsContent until the first answer. */
+.results-intro {
+  display: flex; flex-direction: column;
   gap: 14px;
-  padding: 36px 16px;
-  text-align: center;
+  padding: 6px 2px 4px;
 }
-.empty-state--rich .empty-state__art {
-  width: 96px; height: 72px;
+.results-intro__head {
+  display: flex; align-items: center; gap: 8px;
+}
+.results-intro__icon {
+  width: 28px; height: 28px;
   display: grid; place-items: center;
-  background: linear-gradient(180deg, var(--accent-50), transparent);
-  border-radius: 14px;
-  border: 1px dashed var(--accent-soft);
+  border-radius: 8px;
+  background: linear-gradient(135deg, var(--accent-50), #fff);
+  border: 1px solid var(--accent-soft);
+  font-size: 14px;
 }
-.empty-state--rich .empty-state__text { display: flex; flex-direction: column; gap: 4px; max-width: 280px; }
-.empty-state--rich .empty-state__text strong { font-size: 14px; color: var(--text-primary); font-weight: 600; }
-.empty-state--rich .empty-state__text span   { font-size: 12.5px; color: var(--text-secondary); line-height: 1.5; }
+.results-intro__title {
+  font-size: 13.5px;
+  font-weight: 700;
+  color: var(--text-primary);
+  letter-spacing: -0.005em;
+}
+.results-intro__list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex; flex-direction: column;
+  gap: 8px;
+}
+.results-intro__list li {
+  font-size: 13px;
+  color: var(--text-primary);
+  line-height: 1.5;
+  display: flex; align-items: baseline; gap: 10px;
+}
+.results-intro__list li::before {
+  content: "";
+  flex-shrink: 0;
+  width: 5px; height: 5px; border-radius: 50%;
+  background: var(--accent);
+  display: inline-block;
+  transform: translateY(-2px);
+}
+.results-intro__footer {
+  margin-top: 4px;
+  padding-top: 12px;
+  border-top: 1px dashed var(--border);
+  font-size: 12.5px;
+  color: var(--text-tertiary);
+  line-height: 1.5;
+}
 
 /* ─────────── results table ─────────── */
 

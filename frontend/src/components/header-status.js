@@ -12,7 +12,9 @@ function apply(host, stats) {
   const primary = host.querySelector('.header-status__primary');
   const secondary = host.querySelector('.header-status__secondary');
   if (primary)   primary.textContent   = isLive ? 'Онлайн' : 'Подключение…';
-  if (secondary) secondary.textContent = isLive ? 'База данных подключена' : 'База данных';
+  // Was "База данных подключена" — звучало как инфраструктура. Делаем
+  // нейтрально: пользователю интересны источники, а не Postgres.
+  if (secondary) secondary.textContent = 'источники данных';
 }
 
 export function mountHeaderStatus(host) {

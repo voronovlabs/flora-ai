@@ -1,19 +1,18 @@
 // Dashboard-top: AI recommendations + compact action pills.
 //
-// What this turn changed conceptually:
-//   • The KPI strip is gone — the three at-a-glance numbers live in the
-//     hero chips, and the avg/min/max ones appear inline in the hero
-//     "pulse" line (also driven from here).
-//   • Insight cards now look like analyst recommendations:
-//        [badge] · [title] · [main value] · [hint] · [CTA link]
-//     They have TWO actions: the main body is a <button> that dispatches
-//     existing data-action (smart-question / preset), and the CTA at the
-//     bottom is a real <a target="_blank" rel="noopener"> pointing to the
-//     product URL (if data has one) or the source domain.
-//   • The 6 action cards become a single row of compact pills.
+// What this turn changed:
+//   • Severity badges removed entirely — the card titles speak for themselves.
+//   • Every insight card now carries a one-line interpretation ("note") —
+//     a human "что произошло" instead of just a number.
+//   • CTA wording unified to two options:
+//       — "Открыть товар"   (when we have a product URL)
+//       — "Открыть магазин" (otherwise)
+//   • Product URL is picked in priority order: product_url > url >
+//     product_key — future-proof for richer backend payloads.
+//   • The link is a real <a target="_blank" rel="noopener">.
 //
-// All actions still flow through the existing data-action delegation in
-// app.js — no new event handlers, no store/reducer/ChatEngine changes.
+// Still using the existing data-action delegation in app.js — no new
+// handlers, no store/reducer/ChatEngine changes.
 
 import { askPreset } from '../api.js';
 import { store, select } from '../state/store.js';
@@ -22,10 +21,6 @@ import { escapeHtml, fmtInt, fmtMoney, fmtDateISO } from '../format.js';
 let host = null;
 
 // ── source-name → external URL ───────────────────────────────────────
-// We use this to give every insight card a real "Перейти на сайт" link.
-// Order matters: most-specific (full host) first, then known short
-// names. Anything we can't recognise becomes null so the CTA stays
-// disabled instead of pointing at a broken target.
 
 const KNOWN_SOURCES = {
   'florist':     'https://florist.ru',
@@ -65,33 +60,46 @@ function safeUrl(url) {
   return null;
 }
 
-// ── HTML helpers ─────────────────────────────────────────────────────
-
-function badgeLabel(severity) {
-  if (severity === 'opportunity') return 'Возможность';
-  if (severity === 'risk')        return 'Риск';
-  if (severity === 'leader')      return 'Лидер рынка';
-  if (severity === 'benchmark')   return 'Ценовой ориентир';
-  return 'Сигнал';
+// Priority-ordered pick of a product URL from a row, per UX spec:
+//   product_url > url > product_key (last only if it parses as URL).
+function pickProductUrl(row) {
+  if (!row) return null;
+  const candidates = [row.product_url, row.url, row.product_key];
+  for (let i = 0; i < candidates.length; i++) {
+    const u = safeUrl(candidates[i]);
+    if (u) return u;
+  }
+  return null;
 }
 
+// ── HTML helpers ─────────────────────────────────────────────────────
+
+// Insight card structure (no more badges):
+//
+//   [icon]
+//   Title (eyebrow)
+//   Value (big)
+//   Hint (metric + source)
+//   Note (one-line human interpretation)
+//   ────────────
+//   CTA →
+//
+// `note` is static per insight type — it's the "что произошло"
+// sentence; data-driven hint shows the metric line.
 function insightCardHtml(opts) {
-  const sev = opts.severity || 'leader';
   return (
-    '<div class="insight-card insight-card--' + sev + '" data-insight="' + escapeHtml(opts.key || '') + '">' +
+    '<div class="insight-card" data-insight="' + escapeHtml(opts.key || '') + '">' +
       '<button type="button" class="insight-card__main" ' + (opts.mainData || '') + '>' +
         '<div class="insight-card__top">' +
           '<span class="insight-card__icon">' + opts.icon + '</span>' +
-          '<span class="insight-card__badge insight-card__badge--' + sev + '">' +
-            escapeHtml(badgeLabel(sev)) +
-          '</span>' +
         '</div>' +
         '<div class="insight-card__title">' + escapeHtml(opts.title || '') + '</div>' +
         '<div class="insight-card__value">' + (opts.value || '<span class="placeholder">—</span>') + '</div>' +
         '<div class="insight-card__hint">' + (opts.hint ? escapeHtml(opts.hint) : '&nbsp;') + '</div>' +
+        '<div class="insight-card__note">' + escapeHtml(opts.note || '') + '</div>' +
       '</button>' +
       '<a class="insight-card__cta" href="#" target="_blank" rel="noopener" aria-disabled="true">' +
-        '<span class="insight-card__cta-label">' + escapeHtml(opts.cta || 'Подробнее') + '</span>' +
+        '<span class="insight-card__cta-label">' + escapeHtml(opts.cta || 'Открыть магазин') + '</span>' +
         '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
           '<line x1="5" y1="12" x2="19" y2="12"></line>' +
           '<polyline points="13 6 19 12 13 18"></polyline>' +
@@ -132,28 +140,32 @@ function renderShell() {
       '</header>' +
       '<div class="insights-grid" id="insightsGrid">' +
         insightCardHtml({
-          key: 'leader', severity: 'leader', icon: '🏆',
+          key: 'leader', icon: '🏆',
           title: 'Самый широкий ассортимент',
+          note: 'Лидер рынка по количеству товаров.',
           mainData: 'data-action="smart-question" data-question="Расскажи подробнее про лидера рынка"',
           cta: 'Открыть магазин',
         }) +
         insightCardHtml({
-          key: 'top-price', severity: 'benchmark', icon: '💎',
+          key: 'top-price', icon: '💎',
           title: 'Максимальная цена рынка',
+          note: 'Самое дорогое предложение среди отслеживаемых магазинов.',
           mainData: 'data-action="smart-question" data-question="Покажи самый дорогой букет и магазин"',
-          cta: 'Перейти на сайт',
+          cta: 'Открыть магазин',
         }) +
         insightCardHtml({
-          key: 'max-drop', severity: 'opportunity', icon: '📉',
+          key: 'max-drop', icon: '📉',
           title: 'Крупнейшее снижение цены',
+          note: 'Вероятно началась акция или скидка.',
           mainData: 'data-action="preset" data-preset="top_price_changes"',
-          cta: 'Открыть детали',
+          cta: 'Открыть магазин',
         }) +
         insightCardHtml({
-          key: 'max-rise', severity: 'risk', icon: '📈',
+          key: 'max-rise', icon: '📈',
           title: 'Крупнейший рост цены',
+          note: 'Возможный сигнал повышенного спроса.',
           mainData: 'data-action="preset" data-preset="top_price_changes"',
-          cta: 'Открыть детали',
+          cta: 'Открыть магазин',
         }) +
       '</div>' +
     '</section>' +
@@ -169,7 +181,7 @@ function renderShell() {
     '</section>';
 }
 
-// ── insight binders ─────────────────────────────────────────────────
+// ── value/cta binders ───────────────────────────────────────────────
 
 function setInsightValue(idx, value, hint) {
   const grid = document.getElementById('insightsGrid');
@@ -182,6 +194,8 @@ function setInsightValue(idx, value, hint) {
   if (h && hint !== undefined) h.textContent = hint;
 }
 
+// Sets href + label. label can only be one of:
+//   "Открыть товар" | "Открыть магазин"
 function setInsightCta(idx, href, label) {
   const grid = document.getElementById('insightsGrid');
   if (!grid) return;
@@ -198,6 +212,14 @@ function setInsightCta(idx, href, label) {
     cta.setAttribute('href', '#');
     cta.setAttribute('aria-disabled', 'true');
   }
+}
+
+// Returns ["Открыть товар", productUrl] if a product URL exists on the
+// row, otherwise ["Открыть магазин", sourceDomain(row.source) || null].
+function pickCta(row) {
+  const productUrl = pickProductUrl(row);
+  if (productUrl) return ['Открыть товар', productUrl];
+  return ['Открыть магазин', sourceDomain(row && row.source) || null];
 }
 
 function setHeroPulse(html) {
@@ -237,6 +259,7 @@ function applyStatsSlice(stats) {
       ? fmtInt(leader.sku_count) + ' позиций · ' + share + '% рынка'
       : fmtInt(leader.sku_count) + ' позиций';
     setInsightValue(0, escapeHtml(String(leader.source)), hint);
+    // Leader insight is always "Открыть магазин" — we have a store, no product.
     setInsightCta(0, sourceDomain(leader.source), 'Открыть магазин');
   }
 }
@@ -250,13 +273,14 @@ function bootstrap() {
     const data = (r && r.payload && Array.isArray(r.payload.data)) ? r.payload.data : [];
     if (!data.length) return;
 
-    let mins = [], avgs = [], maxs = [], topMaxSource = null, topMax = -Infinity;
+    let mins = [], avgs = [], maxs = [];
+    let topRow = null, topMax = -Infinity;
     data.forEach(function (row) {
       if (typeof row.min_price === 'number') mins.push(row.min_price);
       if (typeof row.avg_price === 'number') avgs.push(row.avg_price);
       if (typeof row.max_price === 'number') {
         maxs.push(row.max_price);
-        if (row.max_price > topMax) { topMax = row.max_price; topMaxSource = row.source; }
+        if (row.max_price > topMax) { topMax = row.max_price; topRow = row; }
       }
     });
 
@@ -272,9 +296,10 @@ function bootstrap() {
         '<span>от <strong>' + fmtMoney(lo) + '</strong> до <strong>' + fmtMoney(hi) + '</strong></span>'
       );
     }
-    if (topMaxSource !== null) {
-      setInsightValue(1, fmtMoney(topMax), 'у ' + String(topMaxSource));
-      setInsightCta(1, sourceDomain(topMaxSource), 'Перейти на сайт');
+    if (topRow !== null) {
+      setInsightValue(1, fmtMoney(topMax), 'у ' + String(topRow.source));
+      const cta = pickCta(topRow);
+      setInsightCta(1, cta[1], cta[0]);
     }
   }).catch(function () { /* keep skeleton */ });
 
@@ -296,12 +321,8 @@ function bootstrap() {
                    (pct !== null ? ' · подешевел на ' + Math.abs(pct) + '%' : '') +
                    ' · ' + (d.source || '');
       setInsightValue(2, fmtMoney(d.diff), hint);
-      const productUrl = safeUrl(d.product_key);
-      if (productUrl) {
-        setInsightCta(2, productUrl, 'Открыть товар');
-      } else {
-        setInsightCta(2, sourceDomain(d.source), 'Перейти на сайт');
-      }
+      const cta = pickCta(d);
+      setInsightCta(2, cta[1], cta[0]);
     }
     if (rises.length) {
       const u = rises[0];
@@ -312,12 +333,8 @@ function bootstrap() {
                    ' · ' + (u.source || '');
       const moneyTxt = fmtMoney(u.diff).replace(/^[\-−]/, '');
       setInsightValue(3, '+' + moneyTxt, hint);
-      const productUrl = safeUrl(u.product_key);
-      if (productUrl) {
-        setInsightCta(3, productUrl, 'Открыть товар');
-      } else {
-        setInsightCta(3, sourceDomain(u.source), 'Перейти на сайт');
-      }
+      const cta = pickCta(u);
+      setInsightCta(3, cta[1], cta[0]);
     }
   }).catch(function () { /* keep skeleton */ });
 }
