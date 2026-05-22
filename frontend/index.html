@@ -17,12 +17,12 @@
         <div class="brand__mark">🌿</div>
         <div class="brand__name">
           <span class="brand__name-row">Flora<span class="brand__name-accent">AI</span></span>
-          <span class="brand__tag">Market intelligence</span>
+          <span class="brand__tag">Рыночная аналитика</span>
         </div>
       </div>
       <nav class="header-nav">
-        <button class="nav-btn nav-btn--active">Чат</button>
-        <button class="nav-btn">Аналитика</button>
+        <button class="nav-btn nav-btn--active">Диалог</button>
+        <button class="nav-btn">Отчёты</button>
         <button class="nav-btn">Настройки</button>
       </nav>
       <div class="header-side">
@@ -30,31 +30,30 @@
           <span class="header-status__dot"></span>
           <span class="header-status__text">
             <span class="header-status__primary">Подключение…</span>
-            <span class="header-status__secondary">Postgres</span>
+            <span class="header-status__secondary">База данных</span>
           </span>
         </div>
-        <button class="icon-btn icon-btn--ghost" aria-label="User menu" title="Профиль">👤</button>
+        <button class="icon-btn icon-btn--ghost" aria-label="Профиль" title="Профиль">👤</button>
       </div>
     </div>
   </header>
 
   <main class="app-shell">
 
-    <!-- LEFT: workspace = hero / dashboard / chat -->
+    <!-- LEFT: workspace — hero, рекомендации, действия, диалог -->
     <section class="workspace">
 
-      <!-- HERO · command center -->
+      <!-- HERO · единый command center, единый composer -->
       <section class="hero" id="hero">
         <div class="hero__decor" aria-hidden="true"></div>
         <div class="hero__head">
-          <span class="hero__pill">Flora AI · Market Intelligence</span>
-          <h1 class="hero__title">Flora AI анализирует рынок цветов за вас</h1>
+          <span class="hero__pill">Flora AI · Рыночная аналитика</span>
+          <h1 class="hero__title">Ваш AI-аналитик цветочного рынка</h1>
           <p class="hero__subtitle">
-            Цены, ассортимент, конкуренты и изменения — в одном AI-интерфейсе.
+            Цены конкурентов, ассортимент, изменения рынка и рекомендации по действиям.
           </p>
         </div>
 
-        <!-- Composer (embedded into hero, no longer at workspace bottom) -->
         <div class="composer hero__composer">
           <div class="composer__inner">
             <textarea
@@ -72,10 +71,8 @@
               </svg>
             </button>
           </div>
-          <div class="composer__hint">⏎ — отправить · Shift+⏎ — перенос строки</div>
         </div>
 
-        <!-- Live status chips driven by store.stats -->
         <div class="hero__chips" id="heroChips">
           <span class="hero-chip" data-chip="sku">
             <span class="hero-chip__icon">📦</span>
@@ -93,31 +90,34 @@
             <span class="hero-chip__label">обновлено</span>
           </span>
         </div>
+
+        <!-- Inline market pulse (avg / min / max) — заполняется dashboard-top.js -->
+        <div class="hero__pulse" id="heroPulse" hidden></div>
       </section>
 
-      <!-- Mobile tab switcher -->
+      <!-- Mobile-only tab switcher -->
       <nav class="mobile-tabs" id="mobileTabs" data-active-tab="chat">
-        <button class="mobile-tabs__btn is-active" data-action="tab" data-tab="chat">💬 Чат</button>
+        <button class="mobile-tabs__btn is-active" data-action="tab" data-tab="chat">💬 Диалог</button>
         <button class="mobile-tabs__btn" data-action="tab" data-tab="results">📊 Результаты</button>
       </nav>
 
-      <!-- KPI · Insights · Action cards -->
+      <!-- Рекомендации Flora AI + быстрые действия (рендерит dashboard-top.js) -->
       <div class="dashboard-top" id="dashboardTop"></div>
 
-      <!-- Chat: hidden via CSS while #chatMessages is :empty -->
+      <!-- История диалога. Авто-скрывается через :has(:empty), composer'а внутри нет. -->
       <section class="chat-area">
         <div class="chat-messages" id="chatMessages"></div>
       </section>
 
     </section>
 
-    <!-- RIGHT: analytics panel (sticky) -->
+    <!-- RIGHT: аналитическая панель (sticky) -->
     <aside class="analytics-panel" id="resultsPanel">
 
       <article class="panel-card panel-card--coverage">
         <header class="panel-card__head">
           <span class="panel-card__dot panel-card__dot--accent"></span>
-          <h3 class="panel-card__title">Live data coverage</h3>
+          <h3 class="panel-card__title">Покрытие данных</h3>
           <span class="panel-card__meta" id="coverageMeta">—</span>
         </header>
         <div class="panel-card__body" id="statsBox">
@@ -140,6 +140,8 @@
             <button class="icon-btn mobile-toggle" data-action="toggle-results" style="display:none;" aria-label="Закрыть">✕</button>
           </div>
         </header>
+        <!-- Динамическая сводка над таблицей (results-summary.js) -->
+        <div class="results-summary" id="resultsSummary" hidden></div>
         <div class="panel-card__body panel-card__body--scroll" id="resultsContent">
           <div class="empty-state empty-state--rich">
             <div class="empty-state__art" aria-hidden="true">

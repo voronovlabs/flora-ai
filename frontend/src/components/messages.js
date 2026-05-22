@@ -96,6 +96,7 @@ function reconcile(messages) {
     const welcome = host.querySelector('.welcome-message');
     if (welcome) welcome.remove();
   }
+  let lastNode = null;
   messages.forEach((msg) => {
     let node = rendered.get(msg.id);
     if (!node) {
@@ -105,8 +106,16 @@ function reconcile(messages) {
     } else {
       updateMessageNode(node, msg);
     }
+    lastNode = node;
   });
+  // Keep legacy host-scroll for back-compat if chat-messages itself ever
+  // becomes scrollable again. On the new chat-flow layout (chat-area is
+  // not a scroll container), scrolling the last node into view is what
+  // actually brings the fresh bubble onto screen.
   host.scrollTop = host.scrollHeight;
+  if (lastNode && lastNode.scrollIntoView) {
+    try { lastNode.scrollIntoView({ behavior: 'smooth', block: 'end' }); } catch (_) { /* older browsers */ }
+  }
 }
 
 export function mountMessages(hostEl) {

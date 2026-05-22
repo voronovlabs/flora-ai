@@ -1,11 +1,19 @@
-// Dashboard-top: KPI cards + AI insights (with severity badges + CTA)
-// + action cards (split into primary + secondary).
+// Dashboard-top: AI recommendations + compact action pills.
 //
-// IMPORTANT: talks to the api layer directly (askPreset) so KPI/insight
-// bootstrap does NOT show up as a chat message. /stats comes from the
-// store — app.js already fetched it once at boot.
+// What this turn changed conceptually:
+//   • The KPI strip is gone — the three at-a-glance numbers live in the
+//     hero chips, and the avg/min/max ones appear inline in the hero
+//     "pulse" line (also driven from here).
+//   • Insight cards now look like analyst recommendations:
+//        [badge] · [title] · [main value] · [hint] · [CTA link]
+//     They have TWO actions: the main body is a <button> that dispatches
+//     existing data-action (smart-question / preset), and the CTA at the
+//     bottom is a real <a target="_blank" rel="noopener"> pointing to the
+//     product URL (if data has one) or the source domain.
+//   • The 6 action cards become a single row of compact pills.
 //
-// Browser-compat: no spread/rest, no optional chaining in expressions.
+// All actions still flow through the existing data-action delegation in
+// app.js — no new event handlers, no store/reducer/ChatEngine changes.
 
 import { askPreset } from '../api.js';
 import { store, select } from '../state/store.js';
@@ -13,84 +21,100 @@ import { escapeHtml, fmtInt, fmtMoney, fmtDateISO } from '../format.js';
 
 let host = null;
 
-// ── action cards definitions ────────────────────────────────────────
-// Three primary actions reuse existing presets (count_sku / price_stats /
-// top_price_changes); three secondary actions either send a pre-built
-// smart-question or focus the composer. All routed through the existing
-// data-action delegation in app.js.
+// ── source-name → external URL ───────────────────────────────────────
+// We use this to give every insight card a real "Перейти на сайт" link.
+// Order matters: most-specific (full host) first, then known short
+// names. Anything we can't recognise becomes null so the CTA stays
+// disabled instead of pointing at a broken target.
 
-const PRIMARY_ACTIONS = [
-  { icon: '📦', title: 'Ассортимент конкурентов', subtitle: 'Сколько SKU у каждого',
-    data: 'data-action="preset" data-preset="count_sku"' },
-  { icon: '💰', title: 'Анализ цен', subtitle: 'Min / Avg / Max по рынку',
-    data: 'data-action="preset" data-preset="price_stats"' },
-  { icon: '📈', title: 'Изменения цен', subtitle: 'Что подорожало / подешевело',
-    data: 'data-action="preset" data-preset="top_price_changes"' },
-];
+const KNOWN_SOURCES = {
+  'florist':     'https://florist.ru',
+  'florist.ru':  'https://florist.ru',
+  'florist_ru':  'https://florist.ru',
+  'flowwow':     'https://flowwow.com',
+  'flowwow.com': 'https://flowwow.com',
+  'semicvetic':  'https://semicvetic.com',
+  'semicvetik':  'https://semicvetic.com',
+  'семицветик': 'https://semicvetic.com',
+  'azalia':      'https://azalianow.ru',
+  'azalianow':   'https://azalianow.ru',
+  'азалия':     'https://azalianow.ru',
+  'dostavkatsvetov':    'https://dostavkatsvetov.ru',
+  'dostavkatsvetov.ru': 'https://dostavkatsvetov.ru',
+};
 
-const SECONDARY_ACTIONS = [
-  { icon: '🏆', title: 'Лидеры рынка', subtitle: 'У кого широкий ассортимент',
-    data: 'data-action="smart-question" data-question="Кто лидер рынка по ассортименту?"' },
-  { icon: '📉', title: 'Самые дешёвые', subtitle: 'Где минимальные цены',
-    data: 'data-action="smart-question" data-question="Покажи 10 самых дешёвых букетов"' },
-  { icon: '🤖', title: 'Спросить ИИ', subtitle: 'Свободный вопрос про рынок',
-    data: 'data-action="focus-composer"' },
-];
-
-// ── card HTML helpers ───────────────────────────────────────────────
-
-function kpiCardHtml(label, value, hint, opts) {
-  const tone = (opts && opts.tone) ? opts.tone : '';
-  const icon = (opts && opts.icon) ? opts.icon : '';
-  return (
-    '<div class="kpi-card ' + tone + '">' +
-      '<div class="kpi-card__head">' +
-        (icon ? '<span class="kpi-card__icon">' + icon + '</span>' : '') +
-        '<span class="kpi-card__label">' + escapeHtml(label) + '</span>' +
-      '</div>' +
-      '<div class="kpi-card__value">' + value + '</div>' +
-      (hint ? '<div class="kpi-card__hint">' + hint + '</div>' : '') +
-    '</div>'
-  );
+function sourceDomain(source) {
+  if (source === null || source === undefined) return null;
+  const raw = String(source).trim();
+  if (!raw) return null;
+  const s = raw.toLowerCase();
+  if (KNOWN_SOURCES[s]) return KNOWN_SOURCES[s];
+  if (s.indexOf('://') >= 0) return safeUrl(raw);
+  if (s.indexOf('.') > 0) return 'https://' + s;
+  return null;
 }
 
-// AI insight: severity-coloured badge + headline + value + CTA arrow.
-//   severity ∈ "opportunity" | "risk" | "leader" | "move"
+function safeUrl(url) {
+  if (!url) return null;
+  const s = String(url).trim();
+  if (!s) return null;
+  if (/^javascript:/i.test(s)) return null;
+  if (s.indexOf('//') === 0) return 'https:' + s;
+  if (s.charAt(0) === '/') return s;
+  if (/^https?:\/\//i.test(s)) return s;
+  return null;
+}
+
+// ── HTML helpers ─────────────────────────────────────────────────────
+
+function badgeLabel(severity) {
+  if (severity === 'opportunity') return 'Возможность';
+  if (severity === 'risk')        return 'Риск';
+  if (severity === 'leader')      return 'Лидер рынка';
+  if (severity === 'benchmark')   return 'Ценовой ориентир';
+  return 'Сигнал';
+}
+
 function insightCardHtml(opts) {
-  const icon = opts.icon || '✨';
-  const title = opts.title || '';
-  const value = opts.value || '';
-  const hint = opts.hint || '';
-  const severity = opts.severity || 'move';
-  const sevLabel = opts.sevLabel || '';
-  const cta = opts.cta || 'Подробнее';
-  const data = opts.data || '';
+  const sev = opts.severity || 'leader';
   return (
-    '<button type="button" class="insight-card insight-card--' + severity + '" ' + data + '>' +
-      '<div class="insight-card__top">' +
-        '<span class="insight-card__icon">' + icon + '</span>' +
-        '<span class="insight-card__badge insight-card__badge--' + severity + '">' + escapeHtml(sevLabel) + '</span>' +
-      '</div>' +
-      '<div class="insight-card__title">' + escapeHtml(title) + '</div>' +
-      '<div class="insight-card__value">' + (value || '') + '</div>' +
-      (hint ? '<div class="insight-card__hint">' + escapeHtml(hint) + '</div>' : '') +
-      '<div class="insight-card__cta">' +
-        '<span>' + escapeHtml(cta) + '</span>' +
+    '<div class="insight-card insight-card--' + sev + '" data-insight="' + escapeHtml(opts.key || '') + '">' +
+      '<button type="button" class="insight-card__main" ' + (opts.mainData || '') + '>' +
+        '<div class="insight-card__top">' +
+          '<span class="insight-card__icon">' + opts.icon + '</span>' +
+          '<span class="insight-card__badge insight-card__badge--' + sev + '">' +
+            escapeHtml(badgeLabel(sev)) +
+          '</span>' +
+        '</div>' +
+        '<div class="insight-card__title">' + escapeHtml(opts.title || '') + '</div>' +
+        '<div class="insight-card__value">' + (opts.value || '<span class="placeholder">—</span>') + '</div>' +
+        '<div class="insight-card__hint">' + (opts.hint ? escapeHtml(opts.hint) : '&nbsp;') + '</div>' +
+      '</button>' +
+      '<a class="insight-card__cta" href="#" target="_blank" rel="noopener" aria-disabled="true">' +
+        '<span class="insight-card__cta-label">' + escapeHtml(opts.cta || 'Подробнее') + '</span>' +
         '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
           '<line x1="5" y1="12" x2="19" y2="12"></line>' +
           '<polyline points="13 6 19 12 13 18"></polyline>' +
         '</svg>' +
-      '</div>' +
-    '</button>'
+      '</a>' +
+    '</div>'
   );
 }
 
-function actionCardHtml(a, variant) {
+const ACTION_PILLS = [
+  { icon: '📦', label: 'Ассортимент',     data: 'data-action="preset" data-preset="count_sku"' },
+  { icon: '💰', label: 'Цены',           data: 'data-action="preset" data-preset="price_stats"' },
+  { icon: '📈', label: 'Изменения цен',   data: 'data-action="preset" data-preset="top_price_changes"' },
+  { icon: '🏆', label: 'Лидеры рынка',    data: 'data-action="smart-question" data-question="Кто лидер рынка по ассортименту?"' },
+  { icon: '📉', label: 'Самые дешёвые',   data: 'data-action="smart-question" data-question="Покажи 10 самых дешёвых букетов"' },
+  { icon: '🤖', label: 'Свой вопрос',     data: 'data-action="focus-composer"' },
+];
+
+function actionPillHtml(a) {
   return (
-    '<button class="action-card action-card--' + variant + '" ' + a.data + '>' +
-      '<span class="action-card__icon">' + a.icon + '</span>' +
-      '<span class="action-card__title">' + escapeHtml(a.title) + '</span>' +
-      '<span class="action-card__subtitle">' + escapeHtml(a.subtitle) + '</span>' +
+    '<button type="button" class="action-pill" ' + a.data + '>' +
+      '<span class="action-pill__icon">' + a.icon + '</span>' +
+      '<span class="action-pill__label">' + escapeHtml(a.label) + '</span>' +
     '</button>'
   );
 }
@@ -100,144 +124,132 @@ function actionCardHtml(a, variant) {
 function renderShell() {
   if (!host) return;
   host.innerHTML =
-    '<section class="dashboard-section">' +
-      '<header class="section-head">' +
-        '<span class="section-dot"></span>' +
-        '<h2 class="section-title">Обзор рынка</h2>' +
-        '<span class="section-meta" id="kpiMeta">обновляется…</span>' +
-      '</header>' +
-      '<div class="kpi-grid" id="kpiGrid">' +
-        kpiCardHtml('Всего SKU',           '<span class="placeholder">—</span>', '', { icon: '📦' }) +
-        kpiCardHtml('Конкурентов',         '<span class="placeholder">—</span>', '', { icon: '🏪' }) +
-        kpiCardHtml('Средняя цена рынка',  '<span class="placeholder">—</span>', '', { icon: '💸' }) +
-        kpiCardHtml('Самая высокая',       '<span class="placeholder">—</span>', '', { icon: '🚀', tone: 'tone-up' }) +
-        kpiCardHtml('Самая низкая',        '<span class="placeholder">—</span>', '', { icon: '🪙', tone: 'tone-down' }) +
-        kpiCardHtml('Снимок данных',       '<span class="placeholder">—</span>', '', { icon: '🗓' }) +
-      '</div>' +
-    '</section>' +
-
-    '<section class="dashboard-section">' +
+    '<section class="dashboard-section dashboard-section--insights">' +
       '<header class="section-head">' +
         '<span class="section-dot section-dot--insights"></span>' +
-        '<h2 class="section-title">AI Insights</h2>' +
-        '<span class="section-meta">сгенерировано из живых данных</span>' +
+        '<h2 class="section-title">Рекомендации Flora AI</h2>' +
+        '<span class="section-meta" id="insightsMeta">обновляется…</span>' +
       '</header>' +
       '<div class="insights-grid" id="insightsGrid">' +
         insightCardHtml({
-          icon: '🏆', title: 'Лидер по ассортименту',
-          value: '<span class="placeholder">—</span>',
-          severity: 'leader', sevLabel: 'Market leader', cta: 'Открыть',
-          data: 'data-action="smart-question" data-question="Кто лидер рынка по ассортименту?"',
+          key: 'leader', severity: 'leader', icon: '🏆',
+          title: 'Самый широкий ассортимент',
+          mainData: 'data-action="smart-question" data-question="Расскажи подробнее про лидера рынка"',
+          cta: 'Открыть магазин',
         }) +
         insightCardHtml({
-          icon: '💎', title: 'Самый дорогой букет',
-          value: '<span class="placeholder">—</span>',
-          severity: 'move', sevLabel: 'Price benchmark', cta: 'Подробнее',
-          data: 'data-action="smart-question" data-question="Покажи самый дорогой букет и магазин"',
+          key: 'top-price', severity: 'benchmark', icon: '💎',
+          title: 'Максимальная цена рынка',
+          mainData: 'data-action="smart-question" data-question="Покажи самый дорогой букет и магазин"',
+          cta: 'Перейти на сайт',
         }) +
         insightCardHtml({
-          icon: '📉', title: 'Максимальное падение',
-          value: '<span class="placeholder">—</span>',
-          severity: 'opportunity', sevLabel: 'Opportunity', cta: 'Открыть',
-          data: 'data-action="preset" data-preset="top_price_changes"',
+          key: 'max-drop', severity: 'opportunity', icon: '📉',
+          title: 'Крупнейшее снижение цены',
+          mainData: 'data-action="preset" data-preset="top_price_changes"',
+          cta: 'Открыть детали',
         }) +
         insightCardHtml({
-          icon: '📈', title: 'Максимальный рост',
-          value: '<span class="placeholder">—</span>',
-          severity: 'risk', sevLabel: 'Risk', cta: 'Открыть',
-          data: 'data-action="preset" data-preset="top_price_changes"',
+          key: 'max-rise', severity: 'risk', icon: '📈',
+          title: 'Крупнейший рост цены',
+          mainData: 'data-action="preset" data-preset="top_price_changes"',
+          cta: 'Открыть детали',
         }) +
       '</div>' +
     '</section>' +
 
-    '<section class="dashboard-section">' +
+    '<section class="dashboard-section dashboard-section--actions">' +
       '<header class="section-head">' +
         '<span class="section-dot section-dot--actions"></span>' +
-        '<h2 class="section-title">Быстрые действия</h2>' +
-        '<span class="section-meta">один клик — один отчёт</span>' +
+        '<h2 class="section-title">Спросить аналитика</h2>' +
       '</header>' +
-      '<div class="actions-grid actions-grid--primary">' +
-        PRIMARY_ACTIONS.map(function (a) { return actionCardHtml(a, 'primary'); }).join('') +
-      '</div>' +
-      '<div class="actions-grid actions-grid--secondary">' +
-        SECONDARY_ACTIONS.map(function (a) { return actionCardHtml(a, 'secondary'); }).join('') +
+      '<div class="actions-row">' +
+        ACTION_PILLS.map(actionPillHtml).join('') +
       '</div>' +
     '</section>';
 }
 
-// ── data binding ────────────────────────────────────────────────────
+// ── insight binders ─────────────────────────────────────────────────
 
-function setKpi(idx, value, hint) {
-  const grid = document.getElementById('kpiGrid');
-  if (!grid) return;
-  const card = grid.children[idx];
-  if (!card) return;
-  const valueEl = card.querySelector('.kpi-card__value');
-  const hintEl = card.querySelector('.kpi-card__hint');
-  if (valueEl) valueEl.innerHTML = value;
-  if (hint && hintEl) hintEl.textContent = hint;
-  else if (hint && !hintEl) {
-    const d = document.createElement('div');
-    d.className = 'kpi-card__hint';
-    d.textContent = hint;
-    card.appendChild(d);
-  }
-}
-
-function setInsight(idx, value, hint) {
+function setInsightValue(idx, value, hint) {
   const grid = document.getElementById('insightsGrid');
   if (!grid) return;
   const card = grid.children[idx];
   if (!card) return;
   const v = card.querySelector('.insight-card__value');
-  if (v) v.innerHTML = value;
-  if (hint) {
-    const h = card.querySelector('.insight-card__hint');
-    if (h) h.textContent = hint;
-    else {
-      const d = document.createElement('div');
-      d.className = 'insight-card__hint';
-      d.textContent = hint;
-      const cta = card.querySelector('.insight-card__cta');
-      if (cta) card.insertBefore(d, cta);
-      else card.appendChild(d);
-    }
+  const h = card.querySelector('.insight-card__hint');
+  if (v && value !== undefined) v.innerHTML = value;
+  if (h && hint !== undefined) h.textContent = hint;
+}
+
+function setInsightCta(idx, href, label) {
+  const grid = document.getElementById('insightsGrid');
+  if (!grid) return;
+  const card = grid.children[idx];
+  if (!card) return;
+  const cta = card.querySelector('.insight-card__cta');
+  if (!cta) return;
+  const labelEl = cta.querySelector('.insight-card__cta-label');
+  if (labelEl && label) labelEl.textContent = label;
+  if (href) {
+    cta.setAttribute('href', href);
+    cta.setAttribute('aria-disabled', 'false');
+  } else {
+    cta.setAttribute('href', '#');
+    cta.setAttribute('aria-disabled', 'true');
   }
 }
 
-function setMeta(text) {
-  const m = document.getElementById('kpiMeta');
+function setHeroPulse(html) {
+  const el = document.getElementById('heroPulse');
+  if (!el) return;
+  el.innerHTML = html;
+  el.hidden = false;
+}
+
+function setInsightsMeta(text) {
+  const m = document.getElementById('insightsMeta');
   if (m) m.textContent = text;
+}
+
+// ── bootstrap ───────────────────────────────────────────────────────
+
+function pctOf(num, denom) {
+  if (!denom || denom === 0) return null;
+  return Math.round((num / denom) * 100);
 }
 
 function applyStatsSlice(stats) {
   if (!stats || !stats.loaded) {
-    setMeta('обновляется…');
+    setInsightsMeta('обновляется…');
     return;
   }
-  setKpi(0, fmtInt(stats.total_sku || 0));
-  setKpi(1, fmtInt((stats.sources || []).length));
-  setKpi(5, stats.snapshot_date ? fmtDateISO(stats.snapshot_date) : '—');
-  if (stats.snapshot_date) setMeta('обновлено ' + fmtDateISO(stats.snapshot_date));
-
+  if (stats.snapshot_date) {
+    setInsightsMeta('по данным от ' + fmtDateISO(stats.snapshot_date));
+  }
   const sources = (stats.sources || []).slice().sort(function (a, b) {
     return (b.sku_count || 0) - (a.sku_count || 0);
   });
   if (sources.length > 0) {
     const leader = sources[0];
-    setInsight(0, escapeHtml(String(leader.source)), fmtInt(leader.sku_count) + ' позиций');
+    const share = pctOf(leader.sku_count || 0, stats.total_sku || 0);
+    const hint = share !== null
+      ? fmtInt(leader.sku_count) + ' позиций · ' + share + '% рынка'
+      : fmtInt(leader.sku_count) + ' позиций';
+    setInsightValue(0, escapeHtml(String(leader.source)), hint);
+    setInsightCta(0, sourceDomain(leader.source), 'Открыть магазин');
   }
 }
 
 function bootstrap() {
-  // KPI 0/1/5 + leader insight live in the store.
   applyStatsSlice(select.stats(store.getState()));
   store.subscribeSlice(select.stats, applyStatsSlice);
 
-  // Market-wide pricing.
+  // Market-wide pricing (avg / min / max + benchmark insight)
   askPreset('price_stats').then(function (r) {
     const data = (r && r.payload && Array.isArray(r.payload.data)) ? r.payload.data : [];
     if (!data.length) return;
+
     let mins = [], avgs = [], maxs = [], topMaxSource = null, topMax = -Infinity;
     data.forEach(function (row) {
       if (typeof row.min_price === 'number') mins.push(row.min_price);
@@ -247,32 +259,65 @@ function bootstrap() {
         if (row.max_price > topMax) { topMax = row.max_price; topMaxSource = row.source; }
       }
     });
-    if (avgs.length) {
-      const avg = avgs.reduce(function (a, b) { return a + b; }, 0) / avgs.length;
-      setKpi(2, fmtMoney(Math.round(avg)));
+
+    if (avgs.length && mins.length && maxs.length) {
+      const avg = Math.round(avgs.reduce(function (a, b) { return a + b; }, 0) / avgs.length);
+      const lo = Math.min.apply(null, mins);
+      const hi = Math.max.apply(null, maxs);
+      setHeroPulse(
+        '<span class="hero-pulse__lead">Сегодня на рынке</span>' +
+        '<span class="hero-pulse__sep">·</span>' +
+        '<span>средняя <strong>' + fmtMoney(avg) + '</strong></span>' +
+        '<span class="hero-pulse__sep">·</span>' +
+        '<span>от <strong>' + fmtMoney(lo) + '</strong> до <strong>' + fmtMoney(hi) + '</strong></span>'
+      );
     }
-    if (maxs.length) setKpi(3, fmtMoney(Math.max.apply(null, maxs)));
-    if (mins.length) setKpi(4, fmtMoney(Math.min.apply(null, mins)));
     if (topMaxSource !== null) {
-      setInsight(1, fmtMoney(topMax), 'у ' + String(topMaxSource));
+      setInsightValue(1, fmtMoney(topMax), 'у ' + String(topMaxSource));
+      setInsightCta(1, sourceDomain(topMaxSource), 'Перейти на сайт');
     }
   }).catch(function () { /* keep skeleton */ });
 
-  // Top price changes for drop / rise insights.
+  // Drop / Rise insights
   askPreset('top_price_changes').then(function (r) {
     const data = (r && r.payload && Array.isArray(r.payload.data)) ? r.payload.data : [];
     if (!data.length) return;
-    let drops = data.filter(function (x) { return typeof x.diff === 'number' && x.diff < 0; })
-                    .sort(function (a, b) { return a.diff - b.diff; });
-    let rises = data.filter(function (x) { return typeof x.diff === 'number' && x.diff > 0; })
-                    .sort(function (a, b) { return b.diff - a.diff; });
+
+    const drops = data.filter(function (x) { return typeof x.diff === 'number' && x.diff < 0; })
+                      .sort(function (a, b) { return a.diff - b.diff; });
+    const rises = data.filter(function (x) { return typeof x.diff === 'number' && x.diff > 0; })
+                      .sort(function (a, b) { return b.diff - a.diff; });
+
     if (drops.length) {
       const d = drops[0];
-      setInsight(2, fmtMoney(d.diff), (d.name || 'товар') + ' · ' + (d.source || ''));
+      const old_p = typeof d.old_price === 'number' ? d.old_price : null;
+      const pct = old_p ? Math.round((d.diff / old_p) * 100) : null;
+      const hint = (d.name || 'товар') +
+                   (pct !== null ? ' · подешевел на ' + Math.abs(pct) + '%' : '') +
+                   ' · ' + (d.source || '');
+      setInsightValue(2, fmtMoney(d.diff), hint);
+      const productUrl = safeUrl(d.product_key);
+      if (productUrl) {
+        setInsightCta(2, productUrl, 'Открыть товар');
+      } else {
+        setInsightCta(2, sourceDomain(d.source), 'Перейти на сайт');
+      }
     }
     if (rises.length) {
       const u = rises[0];
-      setInsight(3, '+' + fmtMoney(u.diff).replace(/^\D*/, ''), (u.name || 'товар') + ' · ' + (u.source || ''));
+      const old_p = typeof u.old_price === 'number' ? u.old_price : null;
+      const pct = old_p ? Math.round((u.diff / old_p) * 100) : null;
+      const hint = (u.name || 'товар') +
+                   (pct !== null ? ' · подорожал на ' + pct + '%' : '') +
+                   ' · ' + (u.source || '');
+      const moneyTxt = fmtMoney(u.diff).replace(/^[\-−]/, '');
+      setInsightValue(3, '+' + moneyTxt, hint);
+      const productUrl = safeUrl(u.product_key);
+      if (productUrl) {
+        setInsightCta(3, productUrl, 'Открыть товар');
+      } else {
+        setInsightCta(3, sourceDomain(u.source), 'Перейти на сайт');
+      }
     }
   }).catch(function () { /* keep skeleton */ });
 }

@@ -11,8 +11,8 @@ function apply(host, stats) {
   host.setAttribute('data-state', isLive ? 'live' : 'boot');
   const primary = host.querySelector('.header-status__primary');
   const secondary = host.querySelector('.header-status__secondary');
-  if (primary)   primary.textContent   = isLive ? 'Live' : 'Подключение…';
-  if (secondary) secondary.textContent = isLive ? 'Postgres connected' : 'Postgres';
+  if (primary)   primary.textContent   = isLive ? 'Онлайн' : 'Подключение…';
+  if (secondary) secondary.textContent = isLive ? 'База данных подключена' : 'База данных';
 }
 
 export function mountHeaderStatus(host) {

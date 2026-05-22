@@ -20,6 +20,7 @@ import { mountDashboardTop } from './components/dashboard-top.js';
 import { mountTabs, setTab } from './components/tabs.js';
 import { mountHero } from './components/hero.js';
 import { mountHeaderStatus } from './components/header-status.js';
+import { mountResultsSummary } from './components/results-summary.js';
 import { isDebugMode } from './core/logger.js';
 
 function $(id) { return document.getElementById(id); }
@@ -160,6 +161,7 @@ function boot() {
   safe('mountTabs',           function () { mountTabs($('mobileTabs')); });
   safe('mountMessages',       function () { mountMessages($('chatMessages')); });
   safe('mountStatsBox',       function () { mountStatsBox($('statsBox')); });
+  safe('mountResultsSummary', function () { mountResultsSummary($('resultsSummary')); });
   safe('mountResultsPanel',   function () {
     mountResultsPanel({
       panel:   $('resultsPanel'),
