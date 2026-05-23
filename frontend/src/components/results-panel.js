@@ -8,6 +8,7 @@ import { tableRenderer } from '../results/renderers/table.js';
 import { chartRenderer } from '../results/renderers/chart.js';
 import { insightRenderer } from '../results/renderers/insight.js';
 import { exporter } from '../results/exporter.js';
+import { INTRO_HTML } from '../results/intro.js';
 
 // Register built-in renderers exactly once.
 registerRenderer('table', tableRenderer);
@@ -27,16 +28,19 @@ let prevPanelOpen = false;
 function repaint() {
   if (!contentEl) return;
   const { data, renderer } = select.results(store.getState());
-  const impl = getRenderer(renderer);
-  if (!data || data.length === 0) {
-    contentEl.innerHTML = `
-      <div class="empty-state">
-        <div class="empty-icon">📊</div>
-        <div class="empty-text">Здесь будут отображаться результаты ваших запросов</div>
-      </div>
-    `;
+  const hasData = Array.isArray(data) && data.length > 0;
+
+  // Жёсткое правило: если данных нет — ВСЕГДА пишем INTRO_HTML и НЕ
+  // вызываем renderer. Раньше тут была DOM-проверка ("если .results-intro
+  // уже есть — пропустить write") — она не выдерживала повторных
+  // вызовов и оставляла дыру под старый плейсхолдер. Прямая перезапись
+  // дешевле и предсказуемее.
+  if (!hasData) {
+    contentEl.innerHTML = INTRO_HTML;
     return;
   }
+
+  const impl = getRenderer(renderer);
   impl.render(contentEl, data, {});
 }
 

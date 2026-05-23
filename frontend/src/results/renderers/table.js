@@ -2,6 +2,7 @@
 // production-grade today; everything below the table is layout sugar.
 
 import { escapeHtml, fmtInt, fmtMoney, normalizeSource } from '../../format.js';
+import { INTRO_HTML } from '../intro.js';
 
 const HEADER_MAP = {
   source: 'Магазин',
@@ -31,13 +32,12 @@ const PRICE_KEYS = new Set(['price', 'old_price', 'new_price', 'min_price', 'avg
 function isPriceColumn(key) { return PRICE_KEYS.has(key) || key.endsWith('_price'); }
 function isCountColumn(key) { return key === 'sku_count' || key === 'cnt' || key.endsWith('_count'); }
 
+// Если после фильтрации строк не осталось (например, все source ===
+// 'unknown') — показываем единое intro вместо стилизованного "Нет
+// данных". Это единственный путь, по которому раньше всплывал старый
+// плейсхолдер с 📊.
 function emptyState(host) {
-  host.innerHTML = `
-    <div class="empty-state">
-      <div class="empty-icon">📊</div>
-      <div class="empty-text">Нет данных для отображения</div>
-    </div>
-  `;
+  host.innerHTML = INTRO_HTML;
 }
 
 export const tableRenderer = {
