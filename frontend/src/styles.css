@@ -316,7 +316,8 @@ body {
 
 /* ─────────── sections ─────────── */
 
-.dashboard-top { display: flex; flex-direction: column; gap: 22px; }
+/* Больше воздуха между секциями — меньше ощущения BI-дашборда. */
+.dashboard-top { display: flex; flex-direction: column; gap: 30px; }
 .dashboard-section { display: flex; flex-direction: column; gap: 14px; }
 
 .section-head { display: flex; align-items: center; gap: 10px; }
@@ -440,32 +441,42 @@ body {
 .actions-row {
   display: flex; flex-wrap: wrap; gap: 8px;
 }
+/* Action pills: визуально это кнопки-действия, а не теги или фильтры.
+   Больше padding, выделенный icon-блок, более выраженный hover. */
 .action-pill {
   appearance: none; -webkit-appearance: none;
   font-family: inherit;
-  display: inline-flex; align-items: center; gap: 8px;
-  padding: 8px 14px;
+  display: inline-flex; align-items: center; gap: 10px;
+  padding: 11px 18px;
   background: var(--bg-surface);
   border: 1px solid var(--border);
-  border-radius: 999px;
+  border-radius: var(--r-md);
   cursor: pointer;
-  font-size: 13px; font-weight: 500;
+  font-size: 13.5px; font-weight: 600;
   color: var(--text-primary);
-  transition: transform 0.1s, border-color 0.15s, background 0.15s, box-shadow 0.15s;
+  box-shadow: var(--shadow-xs);
+  transition: transform 0.1s, border-color 0.15s, background 0.15s, box-shadow 0.15s, color 0.15s;
 }
 .action-pill:hover {
   border-color: var(--accent);
-  background: var(--accent-50);
+  background: linear-gradient(180deg, #ffffff 0%, var(--accent-50) 100%);
   color: var(--accent-hover);
   transform: translateY(-1px);
-  box-shadow: var(--shadow-xs);
+  box-shadow: var(--shadow-sm);
 }
 .action-pill:focus-visible {
   outline: none;
   border-color: var(--accent);
   box-shadow: 0 0 0 3px var(--accent-50);
 }
-.action-pill__icon { font-size: 14px; line-height: 1; }
+.action-pill__icon {
+  width: 26px; height: 26px;
+  display: grid; place-items: center;
+  border-radius: 8px;
+  background: linear-gradient(135deg, var(--accent-50), #fff);
+  border: 1px solid var(--accent-soft);
+  font-size: 14px; line-height: 1;
+}
 .action-pill__label { letter-spacing: -0.005em; }
 
 /* ─────────── chat-flow (no card) ─────────── */
@@ -591,9 +602,9 @@ body {
   display: flex; flex-direction: column;
 }
 .panel-card__head {
-  padding: 12px 16px;
+  padding: 14px 16px 10px;
   display: flex; align-items: center; gap: 10px;
-  border-bottom: 1px solid var(--border);
+  /* Без разделительной линии — меньше «таблицы», больше «продукта». */
 }
 .panel-card__dot { width: 7px; height: 7px; border-radius: 50%; background: var(--text-tertiary); }
 .panel-card__dot--accent { background: var(--accent); box-shadow: 0 0 0 4px var(--accent-50); }
@@ -817,6 +828,104 @@ body {
   animation: shimmer 1.4s linear infinite;
 }
 @keyframes shimmer { 0%{background-position:200% 0} 100%{background-position:-200% 0} }
+
+/* ─────────── Hero live-status (под чипами, человеческим языком) ─────────── */
+
+.hero__live {
+  position: relative; z-index: 1;
+  margin: 0;
+  font-size: 12.5px;
+  color: var(--text-secondary);
+  display: inline-flex; align-items: center; gap: 6px;
+}
+.hero__live::before {
+  content: "";
+  width: 6px; height: 6px; border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-50);
+}
+
+/* ─────────── AI Summary («Выводы Flora AI») ─────────── */
+
+.ai-summary {
+  background: linear-gradient(180deg, #ffffff 0%, #f7faf9 100%);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  padding: 16px 18px 18px;
+  box-shadow: var(--shadow-xs);
+  display: flex; flex-direction: column; gap: 8px;
+}
+.ai-summary[data-state="loading"] {
+  background: var(--bg-surface);
+}
+.ai-summary__head {
+  display: flex; align-items: center; gap: 10px;
+}
+.ai-summary__icon {
+  width: 28px; height: 28px;
+  display: grid; place-items: center;
+  border-radius: 8px;
+  background: linear-gradient(135deg, var(--accent-50), #fff);
+  border: 1px solid var(--accent-soft);
+  font-size: 15px;
+}
+.ai-summary__title {
+  font-size: 13.5px; font-weight: 700;
+  color: var(--text-primary);
+  letter-spacing: -0.005em;
+  margin: 0;
+}
+.ai-summary__lead {
+  margin: 0;
+  font-size: 13.5px; line-height: 1.5;
+  color: var(--text-primary);
+}
+.ai-summary__list {
+  list-style: none; padding: 0; margin: 4px 0 0;
+  display: flex; flex-direction: column; gap: 6px;
+}
+.ai-summary__list[hidden] { display: none; }
+.ai-summary__list li {
+  font-size: 13px;
+  color: var(--text-secondary);
+  line-height: 1.45;
+  display: flex; align-items: baseline; gap: 10px;
+}
+.ai-summary__list li::before {
+  content: "";
+  flex-shrink: 0;
+  width: 4px; height: 4px; border-radius: 50%;
+  background: var(--accent);
+  display: inline-block;
+  transform: translateY(-2px);
+}
+.ai-summary__list strong {
+  color: var(--text-primary);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ─────────── Coverage: «Показать все» / «Скрыть» ─────────── */
+
+.coverage-toggle {
+  appearance: none; -webkit-appearance: none;
+  font-family: inherit;
+  margin-top: 10px;
+  padding: 6px 0;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  font-size: 12px; font-weight: 600;
+  color: var(--accent-hover);
+  letter-spacing: -0.005em;
+  align-self: flex-start;
+  display: inline-flex; align-items: center; gap: 4px;
+}
+.coverage-toggle:hover { text-decoration: underline; }
+.coverage-toggle:focus-visible {
+  outline: none;
+  text-decoration: underline;
+}
 
 /* ─────────── responsive ─────────── */
 

@@ -1,18 +1,20 @@
-// Dashboard-top: AI recommendations + compact action pills.
+// Dashboard-top: AI Summary + рекомендации Flora AI + быстрые действия.
 //
-// What this turn changed:
-//   • Severity badges removed entirely — the card titles speak for themselves.
-//   • Every insight card now carries a one-line interpretation ("note") —
-//     a human "что произошло" instead of just a number.
-//   • CTA wording unified to two options:
-//       — "Открыть товар"   (when we have a product URL)
-//       — "Открыть магазин" (otherwise)
-//   • Product URL is picked in priority order: product_url > url >
-//     product_key — future-proof for richer backend payloads.
-//   • The link is a real <a target="_blank" rel="noopener">.
+// This turn:
+//   • Insight cards reframed как ВЫВОДЫ аналитика, не KPI:
+//       — Лидер рынка по ассортименту       (note: "На N% больше товаров, чем у ближайшего конкурента.")
+//       — Самое дорогое предложение на рынке (note: "Обнаружено в {source}.")
+//       — Крупнейшее снижение цены          (note: "Вероятно действует акция или сезонная скидка.")
+//       — Крупнейший рост цены              (note: "Наиболее заметный рост среди отслеживаемых товаров.")
+//     Notes теперь динамические — обновляются вместе со значением.
+//   • Перед рекомендациями появилась карточка AI Summary («Выводы Flora AI»).
+//     Заполняется из тех же stats + askPreset результатов — никаких новых
+//     fetch и никаких изменений в store / chat engine.
+//   • Секция действий переименована в «Популярные запросы».
+//   • CTA по-прежнему два варианта: "Открыть товар" / "Открыть магазин".
 //
-// Still using the existing data-action delegation in app.js — no new
-// handlers, no store/reducer/ChatEngine changes.
+// Контракты: askPreset, select.stats, store.subscribeSlice, data-action
+// делегирование — не трогаются.
 
 import { askPreset } from '../api.js';
 import { store, select } from '../state/store.js';
@@ -61,7 +63,7 @@ function safeUrl(url) {
 }
 
 // Priority-ordered pick of a product URL from a row, per UX spec:
-//   product_url > url > product_key (last only if it parses as URL).
+//   product_url > url > product_key (only if any parses as URL).
 function pickProductUrl(row) {
   if (!row) return null;
   const candidates = [row.product_url, row.url, row.product_key];
@@ -74,18 +76,15 @@ function pickProductUrl(row) {
 
 // ── HTML helpers ─────────────────────────────────────────────────────
 
-// Insight card structure (no more badges):
+// Insight card structure:
 //
 //   [icon]
-//   Title (eyebrow)
-//   Value (big)
-//   Hint (metric + source)
+//   Title (вывод аналитика)
+//   Value (главный показатель — число / магазин / цена)
+//   Hint (метрика + источник)
 //   Note (one-line human interpretation)
 //   ────────────
 //   CTA →
-//
-// `note` is static per insight type — it's the "что произошло"
-// sentence; data-driven hint shows the metric line.
 function insightCardHtml(opts) {
   return (
     '<div class="insight-card" data-insight="' + escapeHtml(opts.key || '') + '">' +
@@ -132,6 +131,18 @@ function actionPillHtml(a) {
 function renderShell() {
   if (!host) return;
   host.innerHTML =
+
+    // AI Summary — компактная сводка, рендерится сразу под hero.
+    // Содержимое заполняется по мере прихода данных; до этого — скелет.
+    '<section class="ai-summary" id="aiSummary" data-state="loading">' +
+      '<header class="ai-summary__head">' +
+        '<span class="ai-summary__icon">🤖</span>' +
+        '<h2 class="ai-summary__title">Выводы Flora AI</h2>' +
+      '</header>' +
+      '<p class="ai-summary__lead" id="aiSummaryLead">Анализирую рынок…</p>' +
+      '<ul class="ai-summary__list" id="aiSummaryList" hidden></ul>' +
+    '</section>' +
+
     '<section class="dashboard-section dashboard-section--insights">' +
       '<header class="section-head">' +
         '<span class="section-dot section-dot--insights"></span>' +
@@ -141,29 +152,29 @@ function renderShell() {
       '<div class="insights-grid" id="insightsGrid">' +
         insightCardHtml({
           key: 'leader', icon: '🏆',
-          title: 'Самый широкий ассортимент',
-          note: 'Лидер рынка по количеству товаров.',
+          title: 'Лидер рынка по ассортименту',
+          note: 'Самый широкий ассортимент среди отслеживаемых магазинов.',
           mainData: 'data-action="smart-question" data-question="Расскажи подробнее про лидера рынка"',
           cta: 'Открыть магазин',
         }) +
         insightCardHtml({
           key: 'top-price', icon: '💎',
-          title: 'Максимальная цена рынка',
-          note: 'Самое дорогое предложение среди отслеживаемых магазинов.',
+          title: 'Самое дорогое предложение на рынке',
+          note: 'Цена значительно выше среднего уровня рынка.',
           mainData: 'data-action="smart-question" data-question="Покажи самый дорогой букет и магазин"',
           cta: 'Открыть магазин',
         }) +
         insightCardHtml({
           key: 'max-drop', icon: '📉',
           title: 'Крупнейшее снижение цены',
-          note: 'Вероятно началась акция или скидка.',
+          note: 'Вероятно действует акция или сезонная скидка.',
           mainData: 'data-action="preset" data-preset="top_price_changes"',
           cta: 'Открыть магазин',
         }) +
         insightCardHtml({
           key: 'max-rise', icon: '📈',
           title: 'Крупнейший рост цены',
-          note: 'Возможный сигнал повышенного спроса.',
+          note: 'Наиболее заметный рост среди отслеживаемых товаров.',
           mainData: 'data-action="preset" data-preset="top_price_changes"',
           cta: 'Открыть магазин',
         }) +
@@ -173,7 +184,7 @@ function renderShell() {
     '<section class="dashboard-section dashboard-section--actions">' +
       '<header class="section-head">' +
         '<span class="section-dot section-dot--actions"></span>' +
-        '<h2 class="section-title">Спросить аналитика</h2>' +
+        '<h2 class="section-title">Популярные запросы</h2>' +
       '</header>' +
       '<div class="actions-row">' +
         ACTION_PILLS.map(actionPillHtml).join('') +
@@ -181,7 +192,7 @@ function renderShell() {
     '</section>';
 }
 
-// ── value/cta binders ───────────────────────────────────────────────
+// ── value/cta/note binders ──────────────────────────────────────────
 
 function setInsightValue(idx, value, hint) {
   const grid = document.getElementById('insightsGrid');
@@ -192,6 +203,15 @@ function setInsightValue(idx, value, hint) {
   const h = card.querySelector('.insight-card__hint');
   if (v && value !== undefined) v.innerHTML = value;
   if (h && hint !== undefined) h.textContent = hint;
+}
+
+function setInsightNote(idx, note) {
+  const grid = document.getElementById('insightsGrid');
+  if (!grid) return;
+  const card = grid.children[idx];
+  if (!card) return;
+  const n = card.querySelector('.insight-card__note');
+  if (n && note !== undefined && note !== null) n.textContent = note;
 }
 
 // Sets href + label. label can only be one of:
@@ -234,6 +254,67 @@ function setInsightsMeta(text) {
   if (m) m.textContent = text;
 }
 
+// ── AI Summary state ────────────────────────────────────────────────
+//
+// summary holds the four facts we surface as bullet points. We rebuild
+// the bullet list whenever any of them updates — the order of bullets
+// is stable and a missing fact is silently skipped.
+
+const summary = {
+  leader:    null, // { source }
+  topPrice:  null, // { price }
+  maxDrop:   null, // { diff }
+  maxRise:   null, // { diff }
+};
+
+function renderAiSummary() {
+  const root  = document.getElementById('aiSummary');
+  const lead  = document.getElementById('aiSummaryLead');
+  const list  = document.getElementById('aiSummaryList');
+  if (!root || !lead || !list) return;
+
+  const items = [];
+  if (summary.leader && summary.leader.source) {
+    items.push('Лидер по ассортименту — <strong>' + escapeHtml(String(summary.leader.source)) + '</strong>');
+  }
+  if (summary.topPrice && typeof summary.topPrice.price === 'number') {
+    items.push('Самый дорогой товар — <strong>' + escapeHtml(fmtMoney(summary.topPrice.price)) + '</strong>');
+  }
+  if (summary.maxDrop && typeof summary.maxDrop.diff === 'number') {
+    items.push('Максимальное снижение цены — <strong>' + escapeHtml(fmtMoney(summary.maxDrop.diff)) + '</strong>');
+  }
+  if (summary.maxRise && typeof summary.maxRise.diff === 'number') {
+    const m = fmtMoney(summary.maxRise.diff).replace(/^[\-−]/, '');
+    items.push('Максимальный рост цены — <strong>+' + escapeHtml(m) + '</strong>');
+  }
+
+  if (items.length === 0) {
+    lead.textContent = 'Анализирую рынок…';
+    list.hidden = true;
+    list.innerHTML = '';
+    root.setAttribute('data-state', 'loading');
+    return;
+  }
+
+  root.setAttribute('data-state', 'ready');
+  lead.textContent = 'Flora AI обнаружила ' + items.length + ' ' +
+                     plural(items.length, 'значимое изменение', 'значимых изменения', 'значимых изменений') +
+                     ' на рынке.';
+  list.hidden = false;
+  list.innerHTML = items.map(function (html) {
+    return '<li>' + html + '</li>';
+  }).join('');
+}
+
+function plural(n, one, few, many) {
+  const abs = Math.abs(n) % 100;
+  const last = abs % 10;
+  if (abs >= 11 && abs <= 14) return many;
+  if (last === 1) return one;
+  if (last >= 2 && last <= 4) return few;
+  return many;
+}
+
 // ── bootstrap ───────────────────────────────────────────────────────
 
 function pctOf(num, denom) {
@@ -254,13 +335,25 @@ function applyStatsSlice(stats) {
   });
   if (sources.length > 0) {
     const leader = sources[0];
+    const second = sources.length > 1 ? sources[1] : null;
     const share = pctOf(leader.sku_count || 0, stats.total_sku || 0);
     const hint = share !== null
       ? fmtInt(leader.sku_count) + ' позиций · ' + share + '% рынка'
       : fmtInt(leader.sku_count) + ' позиций';
     setInsightValue(0, escapeHtml(String(leader.source)), hint);
-    // Leader insight is always "Открыть магазин" — we have a store, no product.
+    // Dynamic note: соотношение с ближайшим конкурентом, если он есть.
+    let note = 'Самый широкий ассортимент среди отслеживаемых магазинов.';
+    if (second && (second.sku_count || 0) > 0) {
+      const gap = Math.round((((leader.sku_count || 0) / (second.sku_count || 1)) - 1) * 100);
+      if (gap > 0) {
+        note = 'На ' + gap + '% больше товаров, чем у ближайшего конкурента.';
+      }
+    }
+    setInsightNote(0, note);
     setInsightCta(0, sourceDomain(leader.source), 'Открыть магазин');
+
+    summary.leader = { source: leader.source };
+    renderAiSummary();
   }
 }
 
@@ -298,8 +391,12 @@ function bootstrap() {
     }
     if (topRow !== null) {
       setInsightValue(1, fmtMoney(topMax), 'у ' + String(topRow.source));
+      setInsightNote(1, 'Обнаружено в ' + String(topRow.source) + '.');
       const cta = pickCta(topRow);
       setInsightCta(1, cta[1], cta[0]);
+
+      summary.topPrice = { price: topMax, source: topRow.source };
+      renderAiSummary();
     }
   }).catch(function () { /* keep skeleton */ });
 
@@ -321,8 +418,15 @@ function bootstrap() {
                    (pct !== null ? ' · подешевел на ' + Math.abs(pct) + '%' : '') +
                    ' · ' + (d.source || '');
       setInsightValue(2, fmtMoney(d.diff), hint);
+      const note = pct !== null && Math.abs(pct) >= 15
+        ? 'Снижение на ' + Math.abs(pct) + '% — вероятно акция или распродажа.'
+        : 'Вероятно действует акция или сезонная скидка.';
+      setInsightNote(2, note);
       const cta = pickCta(d);
       setInsightCta(2, cta[1], cta[0]);
+
+      summary.maxDrop = { diff: d.diff };
+      renderAiSummary();
     }
     if (rises.length) {
       const u = rises[0];
@@ -333,8 +437,15 @@ function bootstrap() {
                    ' · ' + (u.source || '');
       const moneyTxt = fmtMoney(u.diff).replace(/^[\-−]/, '');
       setInsightValue(3, '+' + moneyTxt, hint);
+      const note = pct !== null && pct >= 15
+        ? 'Рост на ' + pct + '% — возможный сигнал повышенного спроса.'
+        : 'Наиболее заметный рост среди отслеживаемых товаров.';
+      setInsightNote(3, note);
       const cta = pickCta(u);
       setInsightCta(3, cta[1], cta[0]);
+
+      summary.maxRise = { diff: u.diff };
+      renderAiSummary();
     }
   }).catch(function () { /* keep skeleton */ });
 }

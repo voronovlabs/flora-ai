@@ -1,12 +1,21 @@
-// "Live data coverage" card body. Renders a tiny bar visualisation of
-// each source's SKU count, relative to the leader.
+// "Подключённые магазины" card body. Renders a tiny bar visualisation
+// of each source's SKU count, relative to the leader.
 //
-// Subscribes to select.stats — does NOT change the store contract.
+// This turn: список сворачиваемый. По умолчанию показываем первые 5
+// строк + кнопку «Показать все»; после раскрытия — все строки +
+// кнопку «Скрыть». Состояние локальное (не в store) — это чистый UI
+// toggle без бизнес-эффектов.
+//
+// Подписан только на select.stats — структура данных не трогается.
 
 import { fmtInt, fmtDateISO, escapeHtml } from '../format.js';
 import { store, select } from '../state/store.js';
 
+const DEFAULT_VISIBLE = 5;
+
 let host = null;
+let expanded = false;
+let sortedSources = [];
 
 function setMeta(text) {
   const m = document.getElementById('coverageMeta');
@@ -18,43 +27,49 @@ function renderEmpty() {
   host.innerHTML = '<div class="coverage-empty">Не удалось загрузить покрытие.</div>';
 }
 
-function renderLoaded(stats) {
-  if (!host) return;
-  const sources = (stats.sources || []).slice().sort(function (a, b) {
-    return (b.sku_count || 0) - (a.sku_count || 0);
-  });
+function rowHtml(s, max) {
+  const count = s.sku_count || 0;
+  const pct = max > 0 ? Math.max(2, Math.round((count / max) * 100)) : 0;
+  return (
+    '<div class="coverage-row">' +
+      '<span class="coverage-row__name" title="' + escapeHtml(String(s.source)) + '">' +
+        escapeHtml(String(s.source)) +
+      '</span>' +
+      '<div class="coverage-row__bar">' +
+        '<div class="coverage-row__fill" style="width:' + pct + '%"></div>' +
+      '</div>' +
+      '<span class="coverage-row__value">' + fmtInt(count) + '</span>' +
+    '</div>'
+  );
+}
 
-  if (sources.length === 0) {
+function paint() {
+  if (!host) return;
+  if (!sortedSources.length) {
     host.innerHTML = '<div class="coverage-empty">Источники пока не подключены.</div>';
     setMeta('—');
     return;
   }
+  const max = Math.max.apply(null, sortedSources.map(function (s) { return s.sku_count || 0; }));
+  const visible = expanded ? sortedSources : sortedSources.slice(0, DEFAULT_VISIBLE);
+  const rowsHtml = visible.map(function (s) { return rowHtml(s, max); }).join('');
 
-  const max = Math.max.apply(null, sources.map(function (s) { return s.sku_count || 0; }));
-  const visible = sources.slice(0, 8);
+  const total = sortedSources.length;
+  const remaining = total - DEFAULT_VISIBLE;
+  let toggleHtml = '';
+  if (remaining > 0) {
+    toggleHtml = '<button type="button" class="coverage-toggle" data-coverage-toggle>' +
+      (expanded
+        ? 'Скрыть'
+        : 'Показать все · ' + fmtInt(total)
+      ) +
+    '</button>';
+  }
 
-  const rows = visible.map(function (s) {
-    const count = s.sku_count || 0;
-    const pct = max > 0 ? Math.max(2, Math.round((count / max) * 100)) : 0;
-    return (
-      '<div class="coverage-row">' +
-        '<span class="coverage-row__name" title="' + escapeHtml(String(s.source)) + '">' +
-          escapeHtml(String(s.source)) +
-        '</span>' +
-        '<div class="coverage-row__bar">' +
-          '<div class="coverage-row__fill" style="width:' + pct + '%"></div>' +
-        '</div>' +
-        '<span class="coverage-row__value">' + fmtInt(count) + '</span>' +
-      '</div>'
-    );
-  }).join('');
-
-  const more = sources.length > visible.length
-    ? '<div class="coverage-more">и ещё ' + fmtInt(sources.length - visible.length) + ' источн.</div>'
-    : '';
-
+  const stats = select.stats(store.getState()) || {};
   host.innerHTML =
-    '<div class="coverage-list">' + rows + more + '</div>' +
+    '<div class="coverage-list">' + rowsHtml + '</div>' +
+    toggleHtml +
     '<div class="coverage-summary">' +
       '<span class="coverage-summary__total"><strong>' + fmtInt(stats.total_sku || 0) + '</strong> позиций</span>' +
       '<span class="coverage-summary__sep">·</span>' +
@@ -63,17 +78,29 @@ function renderLoaded(stats) {
       '</span>' +
     '</div>';
 
-  setMeta((sources.length === 1 ? '1 источник' : sources.length + ' источников'));
+  const btn = host.querySelector('[data-coverage-toggle]');
+  if (btn) {
+    btn.addEventListener('click', function () {
+      expanded = !expanded;
+      paint();
+    });
+  }
+
+  setMeta(total === 1 ? '1 источник' : total + ' источников');
+}
+
+function applyStats(stats) {
+  if (!stats || !stats.loaded) return renderEmpty();
+  sortedSources = (stats.sources || []).slice().sort(function (a, b) {
+    return (b.sku_count || 0) - (a.sku_count || 0);
+  });
+  paint();
 }
 
 export function mountStatsBox(hostEl) {
   host = hostEl;
   if (!host) return;
-  // Loading placeholder until /stats resolves.
   host.innerHTML = '<div class="coverage-skeleton">Загружаю покрытие…</div>';
-
-  store.subscribeSlice(select.stats, function (stats) {
-    if (!stats || !stats.loaded) return renderEmpty();
-    renderLoaded(stats);
-  });
+  applyStats(select.stats(store.getState()));
+  store.subscribeSlice(select.stats, applyStats);
 }

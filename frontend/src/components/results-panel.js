@@ -69,13 +69,28 @@ export function mountResultsPanel({ panel, content, overlay }) {
   // Auto-open on first dataset arrival on mobile, ONCE. After the user
   // has either closed the panel manually or the courtesy has fired,
   // `autoOpenedOnce` is true and we leave the panel state alone.
+  //
+  // On desktop we don't open anything (panel is permanently visible on
+  // the right) — but we do gently scroll the results panel into view so
+  // the user doesn't keep staring at the hero after their question got
+  // answered. The scroll fires once per "0 → has data" transition.
   store.subscribeSlice(select.resultsData, (data, prev) => {
-    if (autoOpenedOnce) return;
     const hadData = Array.isArray(prev) && prev.length > 0;
     const hasData = Array.isArray(data) && data.length > 0;
-    if (!hadData && hasData && window.innerWidth <= 1024) {
-      autoOpenedOnce = true;
-      store.dispatch(setPanelOpen(true));
+    if (!hadData && hasData) {
+      if (window.innerWidth <= 1024) {
+        if (!autoOpenedOnce) {
+          autoOpenedOnce = true;
+          store.dispatch(setPanelOpen(true));
+        }
+      } else if (panelEl && typeof panelEl.scrollIntoView === 'function') {
+        // Desktop: scroll the analytics panel into view smoothly.
+        try {
+          panelEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        } catch (_) {
+          panelEl.scrollIntoView();
+        }
+      }
     }
   });
 }

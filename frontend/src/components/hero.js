@@ -1,11 +1,14 @@
-// Hero / command-center component: keeps the three live chips
-// (SKU · конкурентов · обновлено) in sync with store.stats.
+// Hero / command-center component:
+//   • держит три live-chip'а (SKU · конкурентов · обновлено) в синхроне
+//     с store.stats;
+//   • заполняет компактную строку «N магазинов · M товаров под
+//     наблюдением» (#heroLive) — пересказывает чипы человеческим
+//     языком, чтобы hero ощущался как живая система, а не дашборд.
 //
-// No store/action/reducer changes — subscribes to existing select.stats,
-// which is already populated by app.js bootStats() once at boot.
+// Не меняет ни store, ни actions, ни reducers — подписка на
+// существующий select.stats.
 //
-// Browser-compat: no spread/rest, no destructuring inside non-loops, no
-// optional chaining inside expressions; aligned with reducers.js.
+// Browser-compat: без spread/rest, без optional chaining.
 
 import { store, select } from '../state/store.js';
 import { fmtInt, fmtDateISO } from '../format.js';
@@ -17,22 +20,46 @@ function setChip(host, key, value) {
   if (v) v.textContent = value;
 }
 
-function applyStats(host, stats) {
-  if (!host) return;
-  if (!stats || !stats.loaded) {
-    setChip(host, 'sku', '—');
-    setChip(host, 'competitors', '—');
-    setChip(host, 'snapshot', '…');
-    return;
+function plural(n, one, few, many) {
+  const abs = Math.abs(n) % 100;
+  const last = abs % 10;
+  if (abs >= 11 && abs <= 14) return many;
+  if (last === 1) return one;
+  if (last >= 2 && last <= 4) return few;
+  return many;
+}
+
+function applyStats(chipsHost, liveEl, stats) {
+  if (chipsHost) {
+    if (!stats || !stats.loaded) {
+      setChip(chipsHost, 'sku', '—');
+      setChip(chipsHost, 'competitors', '—');
+      setChip(chipsHost, 'snapshot', '…');
+    } else {
+      setChip(chipsHost, 'sku',         fmtInt(stats.total_sku || 0));
+      setChip(chipsHost, 'competitors', fmtInt((stats.sources || []).length));
+      setChip(chipsHost, 'snapshot',    stats.snapshot_date ? fmtDateISO(stats.snapshot_date) : '—');
+    }
   }
-  setChip(host, 'sku',         fmtInt(stats.total_sku || 0));
-  setChip(host, 'competitors', fmtInt((stats.sources || []).length));
-  setChip(host, 'snapshot',    stats.snapshot_date ? fmtDateISO(stats.snapshot_date) : '—');
+  if (liveEl) {
+    if (!stats || !stats.loaded) {
+      liveEl.textContent = 'Подключаюсь к источникам данных…';
+    } else {
+      const shops = (stats.sources || []).length;
+      const sku   = stats.total_sku || 0;
+      const parts = [];
+      if (shops > 0) parts.push(fmtInt(shops) + ' ' + plural(shops, 'магазин', 'магазина', 'магазинов'));
+      if (sku   > 0) parts.push(fmtInt(sku)   + ' ' + plural(sku,   'товар',   'товара',   'товаров'));
+      const tail = parts.length > 1 ? ' под наблюдением' : (parts.length === 1 ? ' под наблюдением' : '');
+      liveEl.textContent = parts.length ? parts.join(' · ') + tail : 'Данные загружаются…';
+    }
+  }
 }
 
 export function mountHero(host) {
   if (!host) return;
-  const chips = host.querySelector('#heroChips') || host;
-  applyStats(chips, select.stats(store.getState()));
-  store.subscribeSlice(select.stats, function (s) { applyStats(chips, s); });
+  const chips  = host.querySelector('#heroChips') || host;
+  const liveEl = host.querySelector('#heroLive');
+  applyStats(chips, liveEl, select.stats(store.getState()));
+  store.subscribeSlice(select.stats, function (s) { applyStats(chips, liveEl, s); });
 }
