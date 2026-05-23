@@ -50,8 +50,7 @@
           <span class="hero__pill">Flora AI · Аналитика цветочного рынка</span>
           <h1 class="hero__title">Ваш AI-аналитик цветочного рынка</h1>
           <p class="hero__subtitle">
-            Отслеживайте цены конкурентов, находите изменения ассортимента
-            и принимайте решения на основе данных рынка.
+            Цены конкурентов, изменения ассортимента и решения на основе данных рынка.
           </p>
         </div>
 
@@ -146,24 +145,43 @@
         </header>
         <!-- Динамическая сводка над таблицей (results-summary.js) -->
         <div class="results-summary" id="resultsSummary" hidden></div>
-        <div class="panel-card__body panel-card__body--scroll" id="resultsContent">
+        <div class="panel-card__body panel-card__body--scroll panel-card__body--intro" id="resultsContent">
           <!-- Pre-query intro. Перезаписывается tableRenderer'ом при первом ответе. -->
           <section class="results-intro">
             <header class="results-intro__head">
-              <span class="results-intro__icon">✨</span>
-              <h4 class="results-intro__title">Что умеет Flora AI</h4>
+              <span class="results-intro__icon">💬</span>
+              <h4 class="results-intro__title">Попробуйте спросить</h4>
             </header>
             <ul class="results-intro__list">
-              <li>Кто лидер рынка по ассортименту</li>
-              <li>Где самые низкие цены</li>
-              <li>Какие товары дорожают</li>
-              <li>Какие товары дешевеют</li>
-              <li>Как меняется рынок</li>
+              <li>
+                <button type="button" class="results-intro__q"
+                  data-action="smart-question"
+                  data-question="Где самые дорогие букеты?">
+                  Где самые дорогие букеты?
+                </button>
+              </li>
+              <li>
+                <button type="button" class="results-intro__q"
+                  data-action="smart-question"
+                  data-question="Какие товары сильнее всего подешевели?">
+                  Какие товары сильнее всего подешевели?
+                </button>
+              </li>
+              <li>
+                <button type="button" class="results-intro__q"
+                  data-action="smart-question"
+                  data-question="Кто лидер рынка по ассортименту?">
+                  Кто лидер рынка по ассортименту?
+                </button>
+              </li>
+              <li>
+                <button type="button" class="results-intro__q"
+                  data-action="smart-question"
+                  data-question="Где минимальные цены?">
+                  Где минимальные цены?
+                </button>
+              </li>
             </ul>
-            <p class="results-intro__footer">
-              Попробуйте один из сценариев слева или задайте собственный
-              вопрос в диалоге.
-            </p>
           </section>
         </div>
       </article>

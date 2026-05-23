@@ -1,20 +1,23 @@
-// Dashboard-top: AI Summary + рекомендации Flora AI + быстрые действия.
+// Dashboard-top: AI executive summary + рекомендации Flora AI + быстрые
+// действия. Презентация поверх существующих stats / askPreset данных —
+// без новых API-вызовов, без изменений в store / chat engine.
 //
 // This turn:
-//   • Insight cards reframed как ВЫВОДЫ аналитика, не KPI:
-//       — Лидер рынка по ассортименту       (note: "На N% больше товаров, чем у ближайшего конкурента.")
-//       — Самое дорогое предложение на рынке (note: "Обнаружено в {source}.")
-//       — Крупнейшее снижение цены          (note: "Вероятно действует акция или сезонная скидка.")
-//       — Крупнейший рост цены              (note: "Наиболее заметный рост среди отслеживаемых товаров.")
-//     Notes теперь динамические — обновляются вместе со значением.
-//   • Перед рекомендациями появилась карточка AI Summary («Выводы Flora AI»).
-//     Заполняется из тех же stats + askPreset результатов — никаких новых
-//     fetch и никаких изменений в store / chat engine.
-//   • Секция действий переименована в «Популярные запросы».
-//   • CTA по-прежнему два варианта: "Открыть товар" / "Открыть магазин".
+//   • Insight cards переработаны как ВЫВОДЫ аналитика. Каждая карточка
+//     отвечает не "какое число?", а "что произошло?":
+//       — Title  = одно предложение-вывод (например "dostavkatsvetov.ru
+//                  удерживает лидерство по ассортименту").
+//       — Text   = одна строка контекста ("1455 позиций · 23% рынка"
+//                  или человеческая интерпретация).
+//       — CTA    = "Открыть товар" / "Открыть магазин" (priority order:
+//                  product_url > url > product_key → sourceDomain).
+//     Big-number value-block убран — он создавал KPI-чувство.
+//   • AI Summary: lead и буллеты переписаны человеческим языком:
+//       — Lead:  "За последнее обновление обнаружено N заметных сигналов на рынке."
+//       — Буллеты: полноценные предложения, а не "metric — value".
 //
-// Контракты: askPreset, select.stats, store.subscribeSlice, data-action
-// делегирование — не трогаются.
+// Контракты askPreset / select.stats / store.subscribeSlice — не
+// трогаются.
 
 import { askPreset } from '../api.js';
 import { store, select } from '../state/store.js';
@@ -62,8 +65,8 @@ function safeUrl(url) {
   return null;
 }
 
-// Priority-ordered pick of a product URL from a row, per UX spec:
-//   product_url > url > product_key (only if any parses as URL).
+// Priority-ordered pick of a product URL from a row:
+//   product_url > url > product_key (last only if it parses as URL).
 function pickProductUrl(row) {
   if (!row) return null;
   const candidates = [row.product_url, row.url, row.product_key];
@@ -74,28 +77,44 @@ function pickProductUrl(row) {
   return null;
 }
 
-// ── HTML helpers ─────────────────────────────────────────────────────
+// Returns ["Открыть товар", productUrl] if a product URL exists,
+// otherwise ["Открыть магазин", sourceDomain(row.source) || null].
+function pickCta(row) {
+  const productUrl = pickProductUrl(row);
+  if (productUrl) return ['Открыть товар', productUrl];
+  return ['Открыть магазин', sourceDomain(row && row.source) || null];
+}
 
-// Insight card structure:
+// ── plural / formatting helpers ─────────────────────────────────────
+
+function plural(n, one, few, many) {
+  const abs = Math.abs(n) % 100;
+  const last = abs % 10;
+  if (abs >= 11 && abs <= 14) return many;
+  if (last === 1) return one;
+  if (last >= 2 && last <= 4) return few;
+  return many;
+}
+
+// ── insight card markup ─────────────────────────────────────────────
+//
+// Новый, компактный layout:
 //
 //   [icon]
-//   Title (вывод аналитика)
-//   Value (главный показатель — число / магазин / цена)
-//   Hint (метрика + источник)
-//   Note (one-line human interpretation)
+//   Title  ← одно предложение-вывод
+//   Text   ← одна строка контекста
 //   ────────────
 //   CTA →
+//
+// Все три поля обновляются динамически после прихода данных.
+
 function insightCardHtml(opts) {
   return (
     '<div class="insight-card" data-insight="' + escapeHtml(opts.key || '') + '">' +
       '<button type="button" class="insight-card__main" ' + (opts.mainData || '') + '>' +
-        '<div class="insight-card__top">' +
-          '<span class="insight-card__icon">' + opts.icon + '</span>' +
-        '</div>' +
-        '<div class="insight-card__title">' + escapeHtml(opts.title || '') + '</div>' +
-        '<div class="insight-card__value">' + (opts.value || '<span class="placeholder">—</span>') + '</div>' +
-        '<div class="insight-card__hint">' + (opts.hint ? escapeHtml(opts.hint) : '&nbsp;') + '</div>' +
-        '<div class="insight-card__note">' + escapeHtml(opts.note || '') + '</div>' +
+        '<span class="insight-card__icon">' + opts.icon + '</span>' +
+        '<div class="insight-card__title">' + escapeHtml(opts.title || 'Анализирую…') + '</div>' +
+        '<div class="insight-card__text">' + escapeHtml(opts.text || '') + '</div>' +
       '</button>' +
       '<a class="insight-card__cta" href="#" target="_blank" rel="noopener" aria-disabled="true">' +
         '<span class="insight-card__cta-label">' + escapeHtml(opts.cta || 'Открыть магазин') + '</span>' +
@@ -132,8 +151,6 @@ function renderShell() {
   if (!host) return;
   host.innerHTML =
 
-    // AI Summary — компактная сводка, рендерится сразу под hero.
-    // Содержимое заполняется по мере прихода данных; до этого — скелет.
     '<section class="ai-summary" id="aiSummary" data-state="loading">' +
       '<header class="ai-summary__head">' +
         '<span class="ai-summary__icon">🤖</span>' +
@@ -150,34 +167,18 @@ function renderShell() {
         '<span class="section-meta" id="insightsMeta">обновляется…</span>' +
       '</header>' +
       '<div class="insights-grid" id="insightsGrid">' +
-        insightCardHtml({
-          key: 'leader', icon: '🏆',
-          title: 'Лидер рынка по ассортименту',
-          note: 'Самый широкий ассортимент среди отслеживаемых магазинов.',
+        insightCardHtml({ key: 'leader',    icon: '🏆',
           mainData: 'data-action="smart-question" data-question="Расскажи подробнее про лидера рынка"',
-          cta: 'Открыть магазин',
-        }) +
-        insightCardHtml({
-          key: 'top-price', icon: '💎',
-          title: 'Самое дорогое предложение на рынке',
-          note: 'Цена значительно выше среднего уровня рынка.',
+          cta: 'Открыть магазин' }) +
+        insightCardHtml({ key: 'top-price', icon: '💎',
           mainData: 'data-action="smart-question" data-question="Покажи самый дорогой букет и магазин"',
-          cta: 'Открыть магазин',
-        }) +
-        insightCardHtml({
-          key: 'max-drop', icon: '📉',
-          title: 'Крупнейшее снижение цены',
-          note: 'Вероятно действует акция или сезонная скидка.',
+          cta: 'Открыть магазин' }) +
+        insightCardHtml({ key: 'max-drop',  icon: '📉',
           mainData: 'data-action="preset" data-preset="top_price_changes"',
-          cta: 'Открыть магазин',
-        }) +
-        insightCardHtml({
-          key: 'max-rise', icon: '📈',
-          title: 'Крупнейший рост цены',
-          note: 'Наиболее заметный рост среди отслеживаемых товаров.',
+          cta: 'Открыть магазин' }) +
+        insightCardHtml({ key: 'max-rise',  icon: '📈',
           mainData: 'data-action="preset" data-preset="top_price_changes"',
-          cta: 'Открыть магазин',
-        }) +
+          cta: 'Открыть магазин' }) +
       '</div>' +
     '</section>' +
 
@@ -192,54 +193,37 @@ function renderShell() {
     '</section>';
 }
 
-// ── value/cta/note binders ──────────────────────────────────────────
+// ── insight binders ─────────────────────────────────────────────────
 
-function setInsightValue(idx, value, hint) {
+function setInsight(idx, opts) {
   const grid = document.getElementById('insightsGrid');
   if (!grid) return;
   const card = grid.children[idx];
   if (!card) return;
-  const v = card.querySelector('.insight-card__value');
-  const h = card.querySelector('.insight-card__hint');
-  if (v && value !== undefined) v.innerHTML = value;
-  if (h && hint !== undefined) h.textContent = hint;
-}
-
-function setInsightNote(idx, note) {
-  const grid = document.getElementById('insightsGrid');
-  if (!grid) return;
-  const card = grid.children[idx];
-  if (!card) return;
-  const n = card.querySelector('.insight-card__note');
-  if (n && note !== undefined && note !== null) n.textContent = note;
-}
-
-// Sets href + label. label can only be one of:
-//   "Открыть товар" | "Открыть магазин"
-function setInsightCta(idx, href, label) {
-  const grid = document.getElementById('insightsGrid');
-  if (!grid) return;
-  const card = grid.children[idx];
-  if (!card) return;
-  const cta = card.querySelector('.insight-card__cta');
-  if (!cta) return;
-  const labelEl = cta.querySelector('.insight-card__cta-label');
-  if (labelEl && label) labelEl.textContent = label;
-  if (href) {
-    cta.setAttribute('href', href);
-    cta.setAttribute('aria-disabled', 'false');
-  } else {
-    cta.setAttribute('href', '#');
-    cta.setAttribute('aria-disabled', 'true');
+  if (opts.title !== undefined) {
+    const t = card.querySelector('.insight-card__title');
+    if (t) t.textContent = opts.title;
   }
-}
-
-// Returns ["Открыть товар", productUrl] if a product URL exists on the
-// row, otherwise ["Открыть магазин", sourceDomain(row.source) || null].
-function pickCta(row) {
-  const productUrl = pickProductUrl(row);
-  if (productUrl) return ['Открыть товар', productUrl];
-  return ['Открыть магазин', sourceDomain(row && row.source) || null];
+  if (opts.text !== undefined) {
+    const x = card.querySelector('.insight-card__text');
+    if (x) x.textContent = opts.text;
+  }
+  if (opts.href !== undefined || opts.ctaLabel !== undefined) {
+    const cta = card.querySelector('.insight-card__cta');
+    if (cta) {
+      if (opts.ctaLabel) {
+        const labelEl = cta.querySelector('.insight-card__cta-label');
+        if (labelEl) labelEl.textContent = opts.ctaLabel;
+      }
+      if (opts.href) {
+        cta.setAttribute('href', opts.href);
+        cta.setAttribute('aria-disabled', 'false');
+      } else if (opts.href === null) {
+        cta.setAttribute('href', '#');
+        cta.setAttribute('aria-disabled', 'true');
+      }
+    }
+  }
 }
 
 function setHeroPulse(html) {
@@ -255,14 +239,10 @@ function setInsightsMeta(text) {
 }
 
 // ── AI Summary state ────────────────────────────────────────────────
-//
-// summary holds the four facts we surface as bullet points. We rebuild
-// the bullet list whenever any of them updates — the order of bullets
-// is stable and a missing fact is silently skipped.
 
 const summary = {
   leader:    null, // { source }
-  topPrice:  null, // { price }
+  topPrice:  null, // { price, source }
   maxDrop:   null, // { diff }
   maxRise:   null, // { diff }
 };
@@ -275,17 +255,17 @@ function renderAiSummary() {
 
   const items = [];
   if (summary.leader && summary.leader.source) {
-    items.push('Лидер по ассортименту — <strong>' + escapeHtml(String(summary.leader.source)) + '</strong>');
+    items.push(escapeHtml(String(summary.leader.source)) + ' удерживает лидерство по ассортименту.');
   }
   if (summary.topPrice && typeof summary.topPrice.price === 'number') {
-    items.push('Самый дорогой товар — <strong>' + escapeHtml(fmtMoney(summary.topPrice.price)) + '</strong>');
+    items.push('Максимальная цена на рынке — <strong>' + escapeHtml(fmtMoney(summary.topPrice.price)) + '</strong>.');
   }
   if (summary.maxDrop && typeof summary.maxDrop.diff === 'number') {
-    items.push('Максимальное снижение цены — <strong>' + escapeHtml(fmtMoney(summary.maxDrop.diff)) + '</strong>');
+    items.push('Самое сильное снижение цены — <strong>' + escapeHtml(fmtMoney(summary.maxDrop.diff)) + '</strong>.');
   }
   if (summary.maxRise && typeof summary.maxRise.diff === 'number') {
     const m = fmtMoney(summary.maxRise.diff).replace(/^[\-−]/, '');
-    items.push('Максимальный рост цены — <strong>+' + escapeHtml(m) + '</strong>');
+    items.push('Самый заметный рост цены — <strong>+' + escapeHtml(m) + '</strong>.');
   }
 
   if (items.length === 0) {
@@ -297,22 +277,13 @@ function renderAiSummary() {
   }
 
   root.setAttribute('data-state', 'ready');
-  lead.textContent = 'Flora AI обнаружила ' + items.length + ' ' +
-                     plural(items.length, 'значимое изменение', 'значимых изменения', 'значимых изменений') +
+  lead.textContent = 'За последнее обновление обнаружено ' + items.length + ' ' +
+                     plural(items.length, 'заметный сигнал', 'заметных сигнала', 'заметных сигналов') +
                      ' на рынке.';
   list.hidden = false;
   list.innerHTML = items.map(function (html) {
     return '<li>' + html + '</li>';
   }).join('');
-}
-
-function plural(n, one, few, many) {
-  const abs = Math.abs(n) % 100;
-  const last = abs % 10;
-  if (abs >= 11 && abs <= 14) return many;
-  if (last === 1) return one;
-  if (last >= 2 && last <= 4) return few;
-  return many;
 }
 
 // ── bootstrap ───────────────────────────────────────────────────────
@@ -335,23 +306,16 @@ function applyStatsSlice(stats) {
   });
   if (sources.length > 0) {
     const leader = sources[0];
-    const second = sources.length > 1 ? sources[1] : null;
-    const share = pctOf(leader.sku_count || 0, stats.total_sku || 0);
-    const hint = share !== null
+    const share  = pctOf(leader.sku_count || 0, stats.total_sku || 0);
+    const text   = share !== null
       ? fmtInt(leader.sku_count) + ' позиций · ' + share + '% рынка'
       : fmtInt(leader.sku_count) + ' позиций';
-    setInsightValue(0, escapeHtml(String(leader.source)), hint);
-    // Dynamic note: соотношение с ближайшим конкурентом, если он есть.
-    let note = 'Самый широкий ассортимент среди отслеживаемых магазинов.';
-    if (second && (second.sku_count || 0) > 0) {
-      const gap = Math.round((((leader.sku_count || 0) / (second.sku_count || 1)) - 1) * 100);
-      if (gap > 0) {
-        note = 'На ' + gap + '% больше товаров, чем у ближайшего конкурента.';
-      }
-    }
-    setInsightNote(0, note);
-    setInsightCta(0, sourceDomain(leader.source), 'Открыть магазин');
-
+    setInsight(0, {
+      title: String(leader.source) + ' удерживает лидерство по ассортименту',
+      text:  text,
+      href:  sourceDomain(leader.source),
+      ctaLabel: 'Открыть магазин',
+    });
     summary.leader = { source: leader.source };
     renderAiSummary();
   }
@@ -361,7 +325,7 @@ function bootstrap() {
   applyStatsSlice(select.stats(store.getState()));
   store.subscribeSlice(select.stats, applyStatsSlice);
 
-  // Market-wide pricing (avg / min / max + benchmark insight)
+  // Market-wide pricing (avg / min / max + top-price insight)
   askPreset('price_stats').then(function (r) {
     const data = (r && r.payload && Array.isArray(r.payload.data)) ? r.payload.data : [];
     if (!data.length) return;
@@ -390,11 +354,23 @@ function bootstrap() {
       );
     }
     if (topRow !== null) {
-      setInsightValue(1, fmtMoney(topMax), 'у ' + String(topRow.source));
-      setInsightNote(1, 'Обнаружено в ' + String(topRow.source) + '.');
+      // Title — это вывод, text — поддерживающий контекст.
+      const avg = avgs.length
+        ? Math.round(avgs.reduce(function (a, b) { return a + b; }, 0) / avgs.length)
+        : null;
+      let text = fmtMoney(topMax);
+      if (avg && topMax >= avg * 1.5) {
+        text += ' · значительно выше среднего рынка';
+      } else if (avg) {
+        text += ' · выше среднего рынка';
+      }
       const cta = pickCta(topRow);
-      setInsightCta(1, cta[1], cta[0]);
-
+      setInsight(1, {
+        title: 'Самое дорогое предложение найдено у ' + String(topRow.source),
+        text:  text,
+        href:  cta[1],
+        ctaLabel: cta[0],
+      });
       summary.topPrice = { price: topMax, source: topRow.source };
       renderAiSummary();
     }
@@ -414,17 +390,23 @@ function bootstrap() {
       const d = drops[0];
       const old_p = typeof d.old_price === 'number' ? d.old_price : null;
       const pct = old_p ? Math.round((d.diff / old_p) * 100) : null;
-      const hint = (d.name || 'товар') +
-                   (pct !== null ? ' · подешевел на ' + Math.abs(pct) + '%' : '') +
-                   ' · ' + (d.source || '');
-      setInsightValue(2, fmtMoney(d.diff), hint);
-      const note = pct !== null && Math.abs(pct) >= 15
-        ? 'Снижение на ' + Math.abs(pct) + '% — вероятно акция или распродажа.'
-        : 'Вероятно действует акция или сезонная скидка.';
-      setInsightNote(2, note);
+      const noun = (d.name && /букет/i.test(d.name)) ? 'Букет' : 'Товар';
+      let text;
+      if (pct !== null) {
+        const tail = Math.abs(pct) >= 30
+          ? ' Возможна акция или сезонная скидка.'
+          : ' Вероятно действует временная скидка.';
+        text = noun + ' подешевел на ' + Math.abs(pct) + '%.' + tail;
+      } else {
+        text = noun + ' подешевел на ' + fmtMoney(Math.abs(d.diff)) + '. Возможна акция или сезонная скидка.';
+      }
       const cta = pickCta(d);
-      setInsightCta(2, cta[1], cta[0]);
-
+      setInsight(2, {
+        title: 'Самое заметное снижение цены',
+        text:  text,
+        href:  cta[1],
+        ctaLabel: cta[0],
+      });
       summary.maxDrop = { diff: d.diff };
       renderAiSummary();
     }
@@ -432,18 +414,22 @@ function bootstrap() {
       const u = rises[0];
       const old_p = typeof u.old_price === 'number' ? u.old_price : null;
       const pct = old_p ? Math.round((u.diff / old_p) * 100) : null;
-      const hint = (u.name || 'товар') +
-                   (pct !== null ? ' · подорожал на ' + pct + '%' : '') +
-                   ' · ' + (u.source || '');
-      const moneyTxt = fmtMoney(u.diff).replace(/^[\-−]/, '');
-      setInsightValue(3, '+' + moneyTxt, hint);
-      const note = pct !== null && pct >= 15
-        ? 'Рост на ' + pct + '% — возможный сигнал повышенного спроса.'
-        : 'Наиболее заметный рост среди отслеживаемых товаров.';
-      setInsightNote(3, note);
+      let text;
+      if (pct !== null) {
+        const tail = pct >= 30
+          ? ' Сигнал заметного скачка спроса.'
+          : ' Возможный сигнал повышенного спроса.';
+        text = 'Цена выросла на ' + pct + '%.' + tail;
+      } else {
+        text = 'Цена выросла на ' + fmtMoney(Math.abs(u.diff)) + '. Возможный сигнал повышенного спроса.';
+      }
       const cta = pickCta(u);
-      setInsightCta(3, cta[1], cta[0]);
-
+      setInsight(3, {
+        title: 'Самый заметный рост цены',
+        text:  text,
+        href:  cta[1],
+        ctaLabel: cta[0],
+      });
       summary.maxRise = { diff: u.diff };
       renderAiSummary();
     }

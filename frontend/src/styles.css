@@ -198,9 +198,11 @@ body {
     linear-gradient(180deg, #ffffff 0%, #fafbfd 100%);
   border: 1px solid var(--border);
   box-shadow: var(--shadow-hero);
-  padding: 32px 36px 28px;
+  /* Сжат ~на 30% по вертикали — рекомендации должны быть видны
+     на первом экране. */
+  padding: 22px 28px 20px;
   display: flex; flex-direction: column;
-  gap: 20px;
+  gap: 14px;
   overflow: hidden;
 }
 .hero__decor {
@@ -213,13 +215,13 @@ body {
 }
 .hero__head {
   position: relative; z-index: 1;
-  display: flex; flex-direction: column; gap: 10px;
+  display: flex; flex-direction: column; gap: 6px;
   max-width: 720px;
 }
 .hero__pill {
   display: inline-flex; align-items: center; align-self: flex-start;
-  padding: 5px 12px;
-  font-size: 11px; font-weight: 700;
+  padding: 4px 10px;
+  font-size: 10.5px; font-weight: 700;
   letter-spacing: 0.08em; text-transform: uppercase;
   background: var(--accent-50);
   color: var(--accent-hover);
@@ -227,17 +229,17 @@ body {
   border: 1px solid var(--accent-soft);
 }
 .hero__title {
-  font-size: clamp(24px, 2.6vw, 34px);
+  font-size: clamp(20px, 2.1vw, 27px);
   font-weight: 700;
-  line-height: 1.12;
-  letter-spacing: -0.025em;
+  line-height: 1.15;
+  letter-spacing: -0.022em;
   color: var(--text-primary);
 }
 .hero__subtitle {
-  font-size: 15px;
+  font-size: 13.5px;
   color: var(--text-secondary);
-  line-height: 1.55;
-  max-width: 580px;
+  line-height: 1.5;
+  max-width: 560px;
 }
 
 /* Hero-embedded composer (now the ONLY composer in the app) */
@@ -286,7 +288,8 @@ body {
 /* Hero live chips */
 .hero__chips {
   position: relative; z-index: 1;
-  display: flex; gap: 8px; flex-wrap: wrap;
+  display: flex; gap: 6px; flex-wrap: wrap;
+  margin-top: 2px;
 }
 .hero-chip {
   display: inline-flex; align-items: baseline; gap: 6px;
@@ -302,13 +305,14 @@ body {
 .hero-chip__value { font-weight: 700; color: var(--text-primary); }
 .hero-chip__label { color: var(--text-tertiary); }
 
-/* Hero pulse — inline market summary */
+/* Hero pulse — inline market summary, поднят ближе к чипам */
 .hero__pulse {
   position: relative; z-index: 1;
-  display: flex; gap: 8px; flex-wrap: wrap;
-  font-size: 13px;
+  display: flex; gap: 6px; flex-wrap: wrap;
+  font-size: 12.5px;
   color: var(--text-secondary);
   align-items: baseline;
+  margin-top: -4px;
 }
 .hero__pulse strong       { color: var(--text-primary); font-weight: 700; font-variant-numeric: tabular-nums; }
 .hero-pulse__lead         { color: var(--text-tertiary); text-transform: uppercase; letter-spacing: 0.06em; font-size: 11px; font-weight: 700; }
@@ -360,59 +364,44 @@ body {
 }
 .insight-card:hover { transform: translateY(-1px); box-shadow: var(--shadow-md); border-color: var(--border-strong); }
 
+/* Insight card v2: title — это вывод (предложение), text — поддерживающий
+   контекст. Big-number value-блок убран — он создавал KPI-чувство. */
 .insight-card__main {
   appearance: none; -webkit-appearance: none;
   font-family: inherit; text-align: left; cursor: pointer; width: 100%;
   border: none; background: transparent;
-  padding: 14px 16px 12px;
-  display: flex; flex-direction: column; gap: 6px;
+  padding: 14px 16px 14px;
+  display: flex; flex-direction: column; gap: 8px;
   min-width: 0;
 }
 .insight-card__main:focus-visible {
   outline: none;
   background: var(--accent-50);
 }
-.insight-card__top { display: flex; align-items: center; gap: 8px; }
 .insight-card__icon {
-  width: 32px; height: 32px;
+  width: 30px; height: 30px;
   display: grid; place-items: center;
-  border-radius: 10px;
+  border-radius: 9px;
   background: linear-gradient(135deg, var(--accent-50), #fff);
-  font-size: 17px;
+  font-size: 16px;
   border: 1px solid var(--accent-soft);
 }
 
 .insight-card__title {
-  font-size: 13.5px; font-weight: 600;
+  font-size: 14.5px; font-weight: 700;
   color: var(--text-primary);
-  letter-spacing: -0.005em;
-  line-height: 1.3;
-  margin-top: 2px;
+  letter-spacing: -0.01em;
+  line-height: 1.35;
 }
-.insight-card__value {
-  font-size: 22px; font-weight: 700;
-  letter-spacing: -0.02em;
-  color: var(--text-primary);
-  white-space: nowrap;
-  line-height: 1.1;
-  font-variant-numeric: tabular-nums;
-}
-.insight-card__hint {
-  font-size: 12.5px;
+.insight-card__text {
+  font-size: 13px;
   color: var(--text-secondary);
-  line-height: 1.4;
-  min-height: 17px;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
+  line-height: 1.5;
 }
-.insight-card__note {
-  font-size: 12.5px;
-  color: var(--text-tertiary);
-  line-height: 1.45;
-  margin-top: 2px;
-  font-style: normal;
+.insight-card__text strong {
+  color: var(--text-primary);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
 }
 
 .insight-card__cta {
@@ -620,6 +609,9 @@ body {
 .panel-card__actions { margin-left: auto; display: flex; gap: 6px; }
 .panel-card__body { padding: 12px 16px; font-size: 13.5px; color: var(--text-secondary); line-height: 1.5; }
 .panel-card__body--scroll { max-height: calc(100vh - var(--header-h) - 360px); min-height: 240px; overflow-y: auto; }
+/* До первого запроса панель результатов должна быть компактной — никакой
+   огромной пустой плашки на первом экране. */
+.panel-card__body--intro { min-height: 0; padding: 10px 14px 14px; }
 
 /* Coverage list */
 .coverage-skeleton { font-size: 12.5px; color: var(--text-tertiary); }
@@ -698,57 +690,70 @@ body {
 .results-summary__sep  { color: var(--text-tertiary); }
 .results-summary__date { color: var(--text-tertiary); }
 
-/* Results intro — shown in #resultsContent until the first answer. */
+/* Results intro — компактное "Попробуйте спросить" с кликабельными вопросами.
+   Без рамок и разделителей, минимум воздуха — это не отдельная карточка,
+   а лёгкое приглашение действовать. */
 .results-intro {
   display: flex; flex-direction: column;
-  gap: 14px;
-  padding: 6px 2px 4px;
+  gap: 10px;
+  padding: 4px 0 0;
 }
 .results-intro__head {
   display: flex; align-items: center; gap: 8px;
 }
 .results-intro__icon {
-  width: 28px; height: 28px;
+  width: 24px; height: 24px;
   display: grid; place-items: center;
-  border-radius: 8px;
+  border-radius: 7px;
   background: linear-gradient(135deg, var(--accent-50), #fff);
   border: 1px solid var(--accent-soft);
-  font-size: 14px;
+  font-size: 12px;
 }
 .results-intro__title {
-  font-size: 13.5px;
+  font-size: 11.5px;
   font-weight: 700;
-  color: var(--text-primary);
-  letter-spacing: -0.005em;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
 }
 .results-intro__list {
   list-style: none;
   padding: 0;
   margin: 0;
   display: flex; flex-direction: column;
-  gap: 8px;
+  gap: 4px;
 }
-.results-intro__list li {
+.results-intro__list li { display: flex; }
+.results-intro__q {
+  appearance: none; -webkit-appearance: none;
+  font-family: inherit;
+  background: transparent;
+  border: none;
+  padding: 8px 10px;
+  text-align: left;
+  width: 100%;
+  border-radius: 8px;
   font-size: 13px;
   color: var(--text-primary);
-  line-height: 1.5;
-  display: flex; align-items: baseline; gap: 10px;
+  line-height: 1.4;
+  cursor: pointer;
+  display: inline-flex; align-items: baseline; gap: 8px;
+  transition: background 0.12s, color 0.12s;
 }
-.results-intro__list li::before {
-  content: "";
+.results-intro__q::before {
+  content: "→";
+  color: var(--accent);
+  font-weight: 700;
   flex-shrink: 0;
-  width: 5px; height: 5px; border-radius: 50%;
-  background: var(--accent);
-  display: inline-block;
-  transform: translateY(-2px);
 }
-.results-intro__footer {
-  margin-top: 4px;
-  padding-top: 12px;
-  border-top: 1px dashed var(--border);
-  font-size: 12.5px;
-  color: var(--text-tertiary);
-  line-height: 1.5;
+.results-intro__q:hover {
+  background: var(--accent-50);
+  color: var(--accent-hover);
+}
+.results-intro__q:focus-visible {
+  outline: none;
+  background: var(--accent-50);
+  box-shadow: 0 0 0 2px var(--accent-soft);
 }
 
 /* ─────────── results table ─────────── */
@@ -984,8 +989,9 @@ body {
   .hero__pulse { font-size: 12px; }
 
   .insights-grid { grid-template-columns: 1fr; }
-  .insight-card__main { padding: 12px 14px 10px; }
-  .insight-card__value { font-size: 17px; }
+  .insight-card__main { padding: 12px 14px 12px; }
+  .insight-card__title { font-size: 14px; }
+  .insight-card__text  { font-size: 12.5px; }
   .insight-card__cta   { padding: 9px 14px; }
 
   .actions-row { gap: 6px; }

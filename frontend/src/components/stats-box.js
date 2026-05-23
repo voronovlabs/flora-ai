@@ -58,11 +58,10 @@ function paint() {
   const remaining = total - DEFAULT_VISIBLE;
   let toggleHtml = '';
   if (remaining > 0) {
+    const moreLabel = 'Показать ещё ' + fmtInt(remaining) + ' ' +
+      pluralShops(remaining);
     toggleHtml = '<button type="button" class="coverage-toggle" data-coverage-toggle>' +
-      (expanded
-        ? 'Скрыть'
-        : 'Показать все · ' + fmtInt(total)
-      ) +
+      (expanded ? 'Скрыть' : escapeHtml(moreLabel)) +
     '</button>';
   }
 
@@ -87,6 +86,15 @@ function paint() {
   }
 
   setMeta(total === 1 ? '1 источник' : total + ' источников');
+}
+
+function pluralShops(n) {
+  const abs = Math.abs(n) % 100;
+  const last = abs % 10;
+  if (abs >= 11 && abs <= 14) return 'магазинов';
+  if (last === 1) return 'магазин';
+  if (last >= 2 && last <= 4) return 'магазина';
+  return 'магазинов';
 }
 
 function applyStats(stats) {

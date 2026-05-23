@@ -44,14 +44,19 @@ function applyStats(chipsHost, liveEl, stats) {
   if (liveEl) {
     if (!stats || !stats.loaded) {
       liveEl.textContent = 'Подключаюсь к источникам данных…';
+      liveEl.removeAttribute('data-ready');
     } else {
       const shops = (stats.sources || []).length;
       const sku   = stats.total_sku || 0;
       const parts = [];
       if (shops > 0) parts.push(fmtInt(shops) + ' ' + plural(shops, 'магазин', 'магазина', 'магазинов'));
       if (sku   > 0) parts.push(fmtInt(sku)   + ' ' + plural(sku,   'товар',   'товара',   'товаров'));
-      const tail = parts.length > 1 ? ' под наблюдением' : (parts.length === 1 ? ' под наблюдением' : '');
-      liveEl.textContent = parts.length ? parts.join(' · ') + tail : 'Данные загружаются…';
+      // "Отслеживается N магазинов · M товаров" — без слова «под наблюдением»,
+      // покороче и без «зависшего» loading-текста после загрузки.
+      liveEl.textContent = parts.length
+        ? 'Отслеживается ' + parts.join(' · ')
+        : 'Данные загружены.';
+      liveEl.setAttribute('data-ready', 'true');
     }
   }
 }
