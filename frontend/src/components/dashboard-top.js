@@ -1,20 +1,15 @@
-// Dashboard-top: AI executive summary + рекомендации Flora AI + быстрые
-// действия. Презентация поверх существующих stats / askPreset данных —
-// без новых API-вызовов, без изменений в store / chat engine.
+// Dashboard-top: рекомендации Flora AI + быстрые действия.
+// Презентация поверх существующих stats / askPreset данных — без новых
+// API-вызовов, без изменений в store / chat engine.
 //
 // This turn:
-//   • Insight cards переработаны как ВЫВОДЫ аналитика. Каждая карточка
-//     отвечает не "какое число?", а "что произошло?":
-//       — Title  = одно предложение-вывод (например "dostavkatsvetov.ru
-//                  удерживает лидерство по ассортименту").
-//       — Text   = одна строка контекста ("1455 позиций · 23% рынка"
-//                  или человеческая интерпретация).
-//       — CTA    = "Открыть товар" / "Открыть магазин" (priority order:
-//                  product_url > url > product_key → sourceDomain).
-//     Big-number value-block убран — он создавал KPI-чувство.
-//   • AI Summary: lead и буллеты переписаны человеческим языком:
-//       — Lead:  "За последнее обновление обнаружено N заметных сигналов на рынке."
-//       — Буллеты: полноценные предложения, а не "metric — value".
+//   • Удалена секция "Выводы Flora AI" — она дублировала карточки.
+//   • CTA-логика без изменений: pickProductUrl(row) проверяет
+//     product_url > url > product_key. Если backend начнёт отдавать
+//     любое из этих полей в price_stats / top_price_changes — CTA
+//     автоматически станет "Открыть товар" с правильным URL. Сейчас
+//     в финальном SELECT эти поля отсутствуют, поэтому все «товарные»
+//     карточки fallback'аются на "Открыть магазин" (sourceDomain).
 //
 // Контракты askPreset / select.stats / store.subscribeSlice — не
 // трогаются.
@@ -85,17 +80,6 @@ function pickCta(row) {
   return ['Открыть магазин', sourceDomain(row && row.source) || null];
 }
 
-// ── plural / formatting helpers ─────────────────────────────────────
-
-function plural(n, one, few, many) {
-  const abs = Math.abs(n) % 100;
-  const last = abs % 10;
-  if (abs >= 11 && abs <= 14) return many;
-  if (last === 1) return one;
-  if (last >= 2 && last <= 4) return few;
-  return many;
-}
-
 // ── insight card markup ─────────────────────────────────────────────
 //
 // Новый, компактный layout:
@@ -151,15 +135,9 @@ function renderShell() {
   if (!host) return;
   host.innerHTML =
 
-    '<section class="ai-summary" id="aiSummary" data-state="loading">' +
-      '<header class="ai-summary__head">' +
-        '<span class="ai-summary__icon">🤖</span>' +
-        '<h2 class="ai-summary__title">Выводы Flora AI</h2>' +
-      '</header>' +
-      '<p class="ai-summary__lead" id="aiSummaryLead">Анализирую рынок…</p>' +
-      '<ul class="ai-summary__list" id="aiSummaryList" hidden></ul>' +
-    '</section>' +
-
+    // Блок «Выводы Flora AI» удалён — он дублировал карточки ниже
+    // и не нёс дополнительной ценности. Сразу после hero идут
+    // карточки рекомендаций.
     '<section class="dashboard-section dashboard-section--insights">' +
       '<header class="section-head">' +
         '<span class="section-dot section-dot--insights"></span>' +
@@ -238,54 +216,6 @@ function setInsightsMeta(text) {
   if (m) m.textContent = text;
 }
 
-// ── AI Summary state ────────────────────────────────────────────────
-
-const summary = {
-  leader:    null, // { source }
-  topPrice:  null, // { price, source }
-  maxDrop:   null, // { diff }
-  maxRise:   null, // { diff }
-};
-
-function renderAiSummary() {
-  const root  = document.getElementById('aiSummary');
-  const lead  = document.getElementById('aiSummaryLead');
-  const list  = document.getElementById('aiSummaryList');
-  if (!root || !lead || !list) return;
-
-  const items = [];
-  if (summary.leader && summary.leader.source) {
-    items.push(escapeHtml(String(summary.leader.source)) + ' удерживает лидерство по ассортименту.');
-  }
-  if (summary.topPrice && typeof summary.topPrice.price === 'number') {
-    items.push('Максимальная цена на рынке — <strong>' + escapeHtml(fmtMoney(summary.topPrice.price)) + '</strong>.');
-  }
-  if (summary.maxDrop && typeof summary.maxDrop.diff === 'number') {
-    items.push('Самое сильное снижение цены — <strong>' + escapeHtml(fmtMoney(summary.maxDrop.diff)) + '</strong>.');
-  }
-  if (summary.maxRise && typeof summary.maxRise.diff === 'number') {
-    const m = fmtMoney(summary.maxRise.diff).replace(/^[\-−]/, '');
-    items.push('Самый заметный рост цены — <strong>+' + escapeHtml(m) + '</strong>.');
-  }
-
-  if (items.length === 0) {
-    lead.textContent = 'Анализирую рынок…';
-    list.hidden = true;
-    list.innerHTML = '';
-    root.setAttribute('data-state', 'loading');
-    return;
-  }
-
-  root.setAttribute('data-state', 'ready');
-  lead.textContent = 'За последнее обновление обнаружено ' + items.length + ' ' +
-                     plural(items.length, 'заметный сигнал', 'заметных сигнала', 'заметных сигналов') +
-                     ' на рынке.';
-  list.hidden = false;
-  list.innerHTML = items.map(function (html) {
-    return '<li>' + html + '</li>';
-  }).join('');
-}
-
 // ── bootstrap ───────────────────────────────────────────────────────
 
 function pctOf(num, denom) {
@@ -316,8 +246,6 @@ function applyStatsSlice(stats) {
       href:  sourceDomain(leader.source),
       ctaLabel: 'Открыть магазин',
     });
-    summary.leader = { source: leader.source };
-    renderAiSummary();
   }
 }
 
@@ -371,8 +299,6 @@ function bootstrap() {
         href:  cta[1],
         ctaLabel: cta[0],
       });
-      summary.topPrice = { price: topMax, source: topRow.source };
-      renderAiSummary();
     }
   }).catch(function () { /* keep skeleton */ });
 
@@ -407,8 +333,6 @@ function bootstrap() {
         href:  cta[1],
         ctaLabel: cta[0],
       });
-      summary.maxDrop = { diff: d.diff };
-      renderAiSummary();
     }
     if (rises.length) {
       const u = rises[0];
@@ -430,8 +354,6 @@ function bootstrap() {
         href:  cta[1],
         ctaLabel: cta[0],
       });
-      summary.maxRise = { diff: u.diff };
-      renderAiSummary();
     }
   }).catch(function () { /* keep skeleton */ });
 }

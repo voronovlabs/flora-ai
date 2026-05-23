@@ -346,10 +346,24 @@ body {
 
 /* ─────────── AI Insight cards · recommendation style ─────────── */
 
+/* Адаптивная сетка с явными брейкпоинтами:
+     <  900px → 1 карточка в ряду
+     >= 900px → 2 карточки в ряду
+     >= 1280px → 4 карточки в ряду
+   Контейнер базируется на размере viewport, а не контейнера, чтобы
+   правый sticky-сайдбар (≈400px) корректно учитывался: workspace на
+   десктопе всегда уже viewport, и при 1280px на воркспейсе хватает
+   ширины для четырёх carтoчек. */
 .insights-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  grid-template-columns: 1fr;
   gap: 12px;
+}
+@media (min-width: 900px) {
+  .insights-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (min-width: 1280px) {
+  .insights-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 }
 .insight-card {
   position: relative;
@@ -848,66 +862,6 @@ body {
   width: 6px; height: 6px; border-radius: 50%;
   background: var(--accent);
   box-shadow: 0 0 0 3px var(--accent-50);
-}
-
-/* ─────────── AI Summary («Выводы Flora AI») ─────────── */
-
-.ai-summary {
-  background: linear-gradient(180deg, #ffffff 0%, #f7faf9 100%);
-  border: 1px solid var(--border);
-  border-radius: var(--r-lg);
-  padding: 16px 18px 18px;
-  box-shadow: var(--shadow-xs);
-  display: flex; flex-direction: column; gap: 8px;
-}
-.ai-summary[data-state="loading"] {
-  background: var(--bg-surface);
-}
-.ai-summary__head {
-  display: flex; align-items: center; gap: 10px;
-}
-.ai-summary__icon {
-  width: 28px; height: 28px;
-  display: grid; place-items: center;
-  border-radius: 8px;
-  background: linear-gradient(135deg, var(--accent-50), #fff);
-  border: 1px solid var(--accent-soft);
-  font-size: 15px;
-}
-.ai-summary__title {
-  font-size: 13.5px; font-weight: 700;
-  color: var(--text-primary);
-  letter-spacing: -0.005em;
-  margin: 0;
-}
-.ai-summary__lead {
-  margin: 0;
-  font-size: 13.5px; line-height: 1.5;
-  color: var(--text-primary);
-}
-.ai-summary__list {
-  list-style: none; padding: 0; margin: 4px 0 0;
-  display: flex; flex-direction: column; gap: 6px;
-}
-.ai-summary__list[hidden] { display: none; }
-.ai-summary__list li {
-  font-size: 13px;
-  color: var(--text-secondary);
-  line-height: 1.45;
-  display: flex; align-items: baseline; gap: 10px;
-}
-.ai-summary__list li::before {
-  content: "";
-  flex-shrink: 0;
-  width: 4px; height: 4px; border-radius: 50%;
-  background: var(--accent);
-  display: inline-block;
-  transform: translateY(-2px);
-}
-.ai-summary__list strong {
-  color: var(--text-primary);
-  font-weight: 700;
-  font-variant-numeric: tabular-nums;
 }
 
 /* ─────────── Coverage: «Показать все» / «Скрыть» ─────────── */
