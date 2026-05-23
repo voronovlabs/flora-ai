@@ -82,15 +82,17 @@ function pickCta(row) {
 
 // ── insight card markup ─────────────────────────────────────────────
 //
-// Новый, компактный layout:
+// Карточка отвечает на три вопроса:
 //
 //   [icon]
-//   Title  ← одно предложение-вывод
-//   Text   ← одна строка контекста
+//   Title              ← что произошло (без доменов в заголовке)
+//   Text               ← краткое объяснение события
+//   Рекомендация Flora AI: <action>   ← что делать (или «Требуется дополнительный анализ»)
 //   ────────────
 //   CTA →
 //
-// Все три поля обновляются динамически после прихода данных.
+// Все три текстовых поля обновляются динамически. До прихода данных
+// показывается мягкий placeholder — без выдуманных действий.
 
 function insightCardHtml(opts) {
   return (
@@ -99,6 +101,10 @@ function insightCardHtml(opts) {
         '<span class="insight-card__icon">' + opts.icon + '</span>' +
         '<div class="insight-card__title">' + escapeHtml(opts.title || 'Анализирую…') + '</div>' +
         '<div class="insight-card__text">' + escapeHtml(opts.text || '') + '</div>' +
+        '<div class="insight-card__rec">' +
+          '<span class="insight-card__rec-label">Рекомендация Flora AI:</span> ' +
+          '<span class="insight-card__rec-text">' + escapeHtml(opts.recommendation || '—') + '</span>' +
+        '</div>' +
       '</button>' +
       '<a class="insight-card__cta" href="#" target="_blank" rel="noopener" aria-disabled="true">' +
         '<span class="insight-card__cta-label">' + escapeHtml(opts.cta || 'Открыть магазин') + '</span>' +
@@ -186,6 +192,10 @@ function setInsight(idx, opts) {
     const x = card.querySelector('.insight-card__text');
     if (x) x.textContent = opts.text;
   }
+  if (opts.recommendation !== undefined) {
+    const r = card.querySelector('.insight-card__rec-text');
+    if (r) r.textContent = opts.recommendation;
+  }
   if (opts.href !== undefined || opts.ctaLabel !== undefined) {
     const cta = card.querySelector('.insight-card__cta');
     if (cta) {
@@ -216,6 +226,44 @@ function setInsightsMeta(text) {
   if (m) m.textContent = text;
 }
 
+// ── recommendation helpers ──────────────────────────────────────────
+//
+// Каждая функция возвращает короткий совет, основанный на уже посчи-
+// танных метриках. Если уверенности недостаточно (нет percent'а в
+// данных) — возвращаем честное «Требуется дополнительный анализ».
+// Никаких выдуманных действий.
+
+function recommendLeader(sharePct) {
+  if (typeof sharePct === 'number' && sharePct >= 25) {
+    return 'Изучить структуру каталога лидера — это ориентир по востребованным категориям.';
+  }
+  return 'Изучить категории лидера, чтобы найти пробелы в вашем ассортименте.';
+}
+
+function recommendPremium(maxPrice, avgPrice) {
+  if (typeof avgPrice === 'number' && avgPrice > 0 && maxPrice >= avgPrice * 1.5) {
+    return 'Изучить ассортимент премиальных позиций конкурентов и оценить потенциал верхнего ценового сегмента.';
+  }
+  return 'Премиальный сегмент пока умеренный — продолжайте наблюдать за динамикой.';
+}
+
+function recommendDrop(pct) {
+  if (pct === null || pct === undefined) return 'Требуется дополнительный анализ.';
+  const abs = Math.abs(pct);
+  if (abs >= 50) return 'Возможно, это акция, распродажа остатков или разовая корректировка цены. Не реагировать изменением цены и понаблюдать 3–5 дней.';
+  if (abs >= 20) return 'Возможна временная акция. Подождать 2–3 дня и проверить, вернётся ли цена.';
+  if (abs >= 10) return 'Возможна точечная корректировка цены конкурентом. Сравнить с вашей ценой.';
+  return 'Колебание в пределах нормы. Сохранять текущую цену.';
+}
+
+function recommendRise(pct) {
+  if (pct === null || pct === undefined) return 'Требуется дополнительный анализ.';
+  if (pct >= 50) return 'Может указывать на повышенный спрос или изменение себестоимости. Проверить аналогичные позиции в вашем ассортименте и оценить повышение цены.';
+  if (pct >= 20) return 'Может указывать на повышенный спрос или изменение себестоимости. Сравнить с вашей текущей ценой и рассмотреть повышение.';
+  if (pct >= 10) return 'Возможная коррекция цены конкурентом. Сравнить с вашей ценой.';
+  return 'Изменение в пределах нормы. Корректировка цены не требуется.';
+}
+
 // ── bootstrap ───────────────────────────────────────────────────────
 
 function pctOf(num, denom) {
@@ -236,13 +284,20 @@ function applyStatsSlice(stats) {
   });
   if (sources.length > 0) {
     const leader = sources[0];
+    const second = sources.length > 1 ? sources[1] : null;
     const share  = pctOf(leader.sku_count || 0, stats.total_sku || 0);
-    const text   = share !== null
-      ? fmtInt(leader.sku_count) + ' позиций · ' + share + '% рынка'
-      : fmtInt(leader.sku_count) + ' позиций';
+
+    let text = 'В каталоге ' + fmtInt(leader.sku_count) + ' позиций';
+    if (share !== null) text += ' · доля рынка ' + share + '%';
+    if (second && (second.sku_count || 0) > 0) {
+      const gap = Math.round((((leader.sku_count || 0) / (second.sku_count || 1)) - 1) * 100);
+      if (gap > 0) text += ' · опережает ближайшего конкурента на ' + gap + '%';
+    }
+
     setInsight(0, {
-      title: String(leader.source) + ' удерживает лидерство по ассортименту',
-      text:  text,
+      title: 'Лидер рынка сохраняет преимущество по ассортименту',
+      text:  text + '.',
+      recommendation: recommendLeader(share),
       href:  sourceDomain(leader.source),
       ctaLabel: 'Открыть магазин',
     });
@@ -282,20 +337,16 @@ function bootstrap() {
       );
     }
     if (topRow !== null) {
-      // Title — это вывод, text — поддерживающий контекст.
       const avg = avgs.length
         ? Math.round(avgs.reduce(function (a, b) { return a + b; }, 0) / avgs.length)
         : null;
-      let text = fmtMoney(topMax);
-      if (avg && topMax >= avg * 1.5) {
-        text += ' · значительно выше среднего рынка';
-      } else if (avg) {
-        text += ' · выше среднего рынка';
-      }
+      const text = 'Обнаружено предложение стоимостью ' + fmtMoney(topMax) +
+                   ' — подтверждает наличие покупателей с высоким чеком.';
       const cta = pickCta(topRow);
       setInsight(1, {
-        title: 'Самое дорогое предложение найдено у ' + String(topRow.source),
+        title: 'На рынке есть предложения с высоким чеком',
         text:  text,
+        recommendation: recommendPremium(topMax, avg),
         href:  cta[1],
         ctaLabel: cta[0],
       });
@@ -315,21 +366,26 @@ function bootstrap() {
     if (drops.length) {
       const d = drops[0];
       const old_p = typeof d.old_price === 'number' ? d.old_price : null;
+      const new_p = typeof d.new_price === 'number' ? d.new_price : null;
       const pct = old_p ? Math.round((d.diff / old_p) * 100) : null;
-      const noun = (d.name && /букет/i.test(d.name)) ? 'Букет' : 'Товар';
+
       let text;
-      if (pct !== null) {
-        const tail = Math.abs(pct) >= 30
-          ? ' Возможна акция или сезонная скидка.'
-          : ' Вероятно действует временная скидка.';
-        text = noun + ' подешевел на ' + Math.abs(pct) + '%.' + tail;
+      if (pct !== null && old_p !== null && new_p !== null) {
+        text = 'Снижение составило ' + Math.abs(pct) + '%, цена упала с ' +
+               fmtMoney(old_p) + ' до ' + fmtMoney(new_p) + '.';
       } else {
-        text = noun + ' подешевел на ' + fmtMoney(Math.abs(d.diff)) + '. Возможна акция или сезонная скидка.';
+        text = 'Зафиксировано снижение на ' + fmtMoney(Math.abs(d.diff)) + '.';
       }
+
+      const title = (pct !== null && Math.abs(pct) >= 30)
+        ? 'Конкурент резко снизил цену на отслеживаемый товар'
+        : 'Зафиксировано заметное снижение цены';
+
       const cta = pickCta(d);
       setInsight(2, {
-        title: 'Самое заметное снижение цены',
+        title: title,
         text:  text,
+        recommendation: recommendDrop(pct),
         href:  cta[1],
         ctaLabel: cta[0],
       });
@@ -337,20 +393,26 @@ function bootstrap() {
     if (rises.length) {
       const u = rises[0];
       const old_p = typeof u.old_price === 'number' ? u.old_price : null;
+      const new_p = typeof u.new_price === 'number' ? u.new_price : null;
       const pct = old_p ? Math.round((u.diff / old_p) * 100) : null;
+
       let text;
-      if (pct !== null) {
-        const tail = pct >= 30
-          ? ' Сигнал заметного скачка спроса.'
-          : ' Возможный сигнал повышенного спроса.';
-        text = 'Цена выросла на ' + pct + '%.' + tail;
+      if (pct !== null && old_p !== null && new_p !== null) {
+        text = 'Рост составил ' + pct + '%, цена поднялась с ' +
+               fmtMoney(old_p) + ' до ' + fmtMoney(new_p) + '.';
       } else {
-        text = 'Цена выросла на ' + fmtMoney(Math.abs(u.diff)) + '. Возможный сигнал повышенного спроса.';
+        text = 'Зафиксировано подорожание на ' + fmtMoney(Math.abs(u.diff)) + '.';
       }
+
+      const title = (pct !== null && pct >= 30)
+        ? 'На рынке заметно вырос ценник на отслеживаемый товар'
+        : 'Зафиксирован заметный рост цены';
+
       const cta = pickCta(u);
       setInsight(3, {
-        title: 'Самый заметный рост цены',
+        title: title,
         text:  text,
+        recommendation: recommendRise(pct),
         href:  cta[1],
         ctaLabel: cta[0],
       });
