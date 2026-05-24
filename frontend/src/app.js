@@ -15,7 +15,7 @@ import { statsLoaded, statsFailed, togglePanel, setPanelOpen, setDebug } from '.
 import { ChatEngine } from './chat/engine.js';
 import { mountMessages, toggleDataBlock } from './components/messages.js';
 import { mountResultsPanel, downloadCsv } from './components/results-panel.js';
-import { mountStatsBox } from './components/stats-box.js';
+import { mountStatsBox, toggleCoverage } from './components/stats-box.js';
 import { mountDashboardTop } from './components/dashboard-top.js';
 import { mountTabs, setTab } from './components/tabs.js';
 import { mountHero } from './components/hero.js';
@@ -78,6 +78,13 @@ function bindEventDelegation() {
 
       case 'toggle-data-block':
         toggleDataBlock(target);
+        break;
+
+      case 'toggle-coverage':
+        // "Подключённые магазины": переключает collapsed/expanded
+        // через event-delegation (a не локальный listener на кнопке),
+        // чтобы пере-рендер списка не терял click-handler.
+        toggleCoverage();
         break;
 
       default:

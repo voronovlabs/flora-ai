@@ -17,6 +17,7 @@ from backend.ai.providers.registry import get_provider
 from backend.core.config import Settings, get_settings
 from backend.core.logging import get_logger
 from backend.repositories.prices import PricesRepository
+from backend.repositories.shop_directory import ShopDirectoryRepository
 
 
 def settings_dep() -> Settings:
@@ -31,12 +32,17 @@ def prices_repo_dep() -> PricesRepository:
     return PricesRepository()
 
 
+def shop_directory_repo_dep() -> ShopDirectoryRepository:
+    return ShopDirectoryRepository()
+
+
 def llm_provider_dep() -> LLMProvider:
     return get_provider()
 
 
 # Type aliases — let routes write `s: Settings_` instead of the long form.
-Settings_   = Annotated[Settings, Depends(settings_dep)]
-Logger_     = Annotated[object, Depends(logger_dep)]
-PricesRepo_ = Annotated[PricesRepository, Depends(prices_repo_dep)]
-LLM_        = Annotated[LLMProvider, Depends(llm_provider_dep)]
+Settings_      = Annotated[Settings, Depends(settings_dep)]
+Logger_        = Annotated[object, Depends(logger_dep)]
+PricesRepo_    = Annotated[PricesRepository, Depends(prices_repo_dep)]
+ShopDirectory_ = Annotated[ShopDirectoryRepository, Depends(shop_directory_repo_dep)]
+LLM_           = Annotated[LLMProvider, Depends(llm_provider_dep)]

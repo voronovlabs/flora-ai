@@ -16,6 +16,7 @@ from backend.repositories.prices import (
     SQL_TOP_PRICE_CHANGES,
     SQL_SNAPSHOT_DATE,  # noqa: F401  (re-exported for backward compat)
 )
+from backend.services.branding import display_name, enrich_rows
 
 
 # ── formatters ──────────────────────────────────────────────────────
@@ -61,6 +62,8 @@ def _fmt_pct(old_v: Any, diff_v: Any) -> Optional[float]:
 def run_count_sku(repo: Optional[PricesRepository] = None) -> Dict[str, Any]:
     repo = repo or PricesRepository()
     data = repo.sku_counts()[:50]
+    # Подмешиваем brand_name + site_url из ref.shop_directory.
+    data = enrich_rows(data)
     snap = repo.snapshot().date_str
 
     title = "📊 Ассортимент конкурентов"
@@ -69,19 +72,19 @@ def run_count_sku(repo: Optional[PricesRepository] = None) -> Dict[str, Any]:
     title += ":"
     lines = [title, ""]
 
-    best_src, best_cnt = None, None
+    best_label, best_cnt = None, None
     for r in data:
-        src_name = r.get("source") or "—"
+        label = r.get("brand_name") or r.get("source") or "—"
         cnt = r.get("sku_count") or 0
-        lines.append("• {} — {} позиций".format(src_name, _fmt_int(cnt)))
+        lines.append("• {} — {} позиций".format(label, _fmt_int(cnt)))
         if best_cnt is None or (cnt or 0) > best_cnt:
             best_cnt = (cnt or 0)
-            best_src = src_name
+            best_label = label
 
-    if best_src is not None:
+    if best_label is not None:
         lines += [
             "",
-            "🏆 Самый широкий ассортимент: {} ({} позиций)".format(best_src, _fmt_int(best_cnt)),
+            "🏆 Самый широкий ассортимент: {} ({} позиций)".format(best_label, _fmt_int(best_cnt)),
         ]
 
     return {"ok": True, "answer": "\n".join(lines), "sql": SQL_COUNT_SKU, "data": data}
@@ -90,6 +93,7 @@ def run_count_sku(repo: Optional[PricesRepository] = None) -> Dict[str, Any]:
 def run_price_stats(repo: Optional[PricesRepository] = None) -> Dict[str, Any]:
     repo = repo or PricesRepository()
     data = repo.price_stats()
+    data = enrich_rows(data)
 
     title = "📈 Цены у конкурентов"
     lines = [title + ":"]
@@ -97,15 +101,15 @@ def run_price_stats(repo: Optional[PricesRepository] = None) -> Dict[str, Any]:
     for r in data:
         if not isinstance(r, dict):
             continue
-        src_name = r.get("source") or "unknown"
+        label = r.get("brand_name") or r.get("source") or "unknown"
         mn = r.get("min_price")
         av = r.get("avg_price")
         mx = r.get("max_price")
         lines.append(
-            f"• {src_name} — от {_fmt_rub(mn)} | в среднем {_fmt_rub(av)} | до {_fmt_rub(mx)}"
+            f"• {label} — от {_fmt_rub(mn)} | в среднем {_fmt_rub(av)} | до {_fmt_rub(mx)}"
         )
 
-    best_src = None
+    best_label = None
     best_max = None
     for r in data:
         if not isinstance(r, dict):
@@ -119,12 +123,12 @@ def run_price_stats(repo: Optional[PricesRepository] = None) -> Dict[str, Any]:
             continue
         if best_max is None or v > best_max:
             best_max = v
-            best_src = r.get("source") or "unknown"
+            best_label = r.get("brand_name") or r.get("source") or "unknown"
 
-    if best_src is not None:
+    if best_label is not None:
         lines += [
             "",
-            f"🏆 Самый дорогой букет (по максимуму): {best_src} — {_fmt_rub(best_max)}",
+            f"🏆 Самый дорогой букет (по максимуму): {best_label} — {_fmt_rub(best_max)}",
         ]
 
     return {"ok": True, "answer": "\n".join(lines), "sql": SQL_PRICE_STATS, "data": data}
@@ -157,13 +161,14 @@ def run_preset(name: str, repo: Optional[PricesRepository] = None) -> Dict[str, 
 def run_top_price_changes(repo: Optional[PricesRepository] = None) -> Dict[str, Any]:
     repo = repo or PricesRepository()
     data = repo.top_price_changes()
+    data = enrich_rows(data)
 
     title = "📉📈 Топ-изменения цен у конкурентов"
     lines = [title + ":"]
 
     rows = [r for r in data if isinstance(r, dict)][:5]
     for r in rows:
-        src_name = r.get("source") or "unknown"
+        shop = r.get("brand_name") or r.get("source") or "unknown"
         name = (r.get("name") or "").strip()
         label = name if name else "товар"
         old_p = r.get("old_price")
@@ -179,7 +184,7 @@ def run_top_price_changes(repo: Optional[PricesRepository] = None) -> Dict[str, 
         pct = _fmt_pct(old_p, diff)
         pct_txt = (f" ({pct}%)" if pct is not None else "")
         lines.append(
-            f"• {src_name} — {label}: {_fmt_rub(old_p)} → {_fmt_rub(new_p)} ({arrow} {_fmt_rub(diff)}){pct_txt}"
+            f"• {shop} — {label}: {_fmt_rub(old_p)} → {_fmt_rub(new_p)} ({arrow} {_fmt_rub(diff)}){pct_txt}"
         )
 
     return {"ok": True, "answer": "\n".join(lines), "sql": SQL_TOP_PRICE_CHANGES, "data": data}

@@ -66,10 +66,22 @@ export const tableRenderer = {
     // parses in older engines that don't accept the `...` token.
     const keys = pref.concat(rest);
 
-    const thead = `<thead><tr>${keys.map((k) => `<th>${HEADER_MAP[k] || k}</th>`).join('')}</tr></thead>`;
+    // Hide raw columns that are surfaced via friendlier labels:
+    //   • brand_name / site_url enrich `source` — мы их не показываем
+    //     отдельной колонкой, но используем как displayValue для source.
+    const HIDDEN_KEYS = new Set(['brand_name', 'site_url']);
+    const visibleKeys = keys.filter(function (k) { return !HIDDEN_KEYS.has(k); });
+
+    const thead = `<thead><tr>${visibleKeys.map((k) => `<th>${HEADER_MAP[k] || k}</th>`).join('')}</tr></thead>`;
     const tbody = `<tbody>${rows.map((row) => {
-      const tds = keys.map((k) => {
+      const tds = visibleKeys.map((k) => {
         const v = row[k];
+        if (k === 'source') {
+          // Show brand_name when ref.shop_directory has it; raw domain as tooltip.
+          const label = row.brand_name ? String(row.brand_name) : String(v ?? '');
+          const tooltip = row.brand_name && v ? ' title="' + escapeHtml(String(v)) + '"' : '';
+          return '<td' + tooltip + '>' + escapeHtml(label) + '</td>';
+        }
         if (isPriceColumn(k)) return `<td class="price-cell">${fmtMoney(v)}</td>`;
         if (isCountColumn(k)) return `<td>${fmtInt(v)}</td>`;
         if (typeof v === 'number') return `<td>${fmtInt(v)}</td>`;

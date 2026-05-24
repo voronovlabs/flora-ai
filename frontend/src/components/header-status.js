@@ -1,20 +1,46 @@
-// Header live-status pill ("Live · Postgres connected" vs "Подключение…").
+// Header live-status pill.
 //
-// Subscribes to select.stats — when stats are loaded successfully it
-// flips the data-state to "live"; CSS handles colour and the dot.
+// Три состояния, на основе select.stats:
+//   1. Подключение / нет данных
+//        primary:   "Подключение…"
+//        secondary: "загружаем данные"
+//        data-state="boot"
+//   2. Загружено + есть snapshot_date
+//        primary:   "Данные актуальны"
+//        secondary: "обновлено DD-MM-YYYY"
+//        data-state="live"
+//   3. Загружено, но snapshot_date отсутствует
+//        primary:   "Данные доступны"
+//        secondary: "источники подключены"
+//        data-state="live"
+//
+// Никаких новых endpoint'ов, никаких health-индикаторов — только
+// существующие поля slice'а `stats`. CSS уже умеет переключать цвет
+// точки через [data-state].
 
 import { store, select } from '../state/store.js';
+import { fmtDateISO } from '../format.js';
 
 function apply(host, stats) {
   if (!host) return;
-  const isLive = !!(stats && stats.loaded);
-  host.setAttribute('data-state', isLive ? 'live' : 'boot');
   const primary = host.querySelector('.header-status__primary');
   const secondary = host.querySelector('.header-status__secondary');
-  if (primary)   primary.textContent   = isLive ? 'Онлайн' : 'Подключение…';
-  // Was "База данных подключена" — звучало как инфраструктура. Делаем
-  // нейтрально: пользователю интересны источники, а не Postgres.
-  if (secondary) secondary.textContent = 'источники данных';
+
+  if (!stats || !stats.loaded) {
+    host.setAttribute('data-state', 'boot');
+    if (primary)   primary.textContent   = 'Подключение…';
+    if (secondary) secondary.textContent = 'загружаем данные';
+    return;
+  }
+
+  host.setAttribute('data-state', 'live');
+  if (stats.snapshot_date) {
+    if (primary)   primary.textContent   = 'Данные актуальны';
+    if (secondary) secondary.textContent = 'обновлено ' + fmtDateISO(stats.snapshot_date);
+  } else {
+    if (primary)   primary.textContent   = 'Данные доступны';
+    if (secondary) secondary.textContent = 'источники подключены';
+  }
 }
 
 export function mountHeaderStatus(host) {

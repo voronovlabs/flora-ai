@@ -1,10 +1,15 @@
-// "Подключённые магазины" card body. Renders a tiny bar visualisation
-// of each source's SKU count, relative to the leader.
+// "Подключённые магазины" — карточка справа.
 //
-// This turn: список сворачиваемый. По умолчанию показываем первые 5
-// строк + кнопку «Показать все»; после раскрытия — все строки +
-// кнопку «Скрыть». Состояние локальное (не в store) — это чистый UI
-// toggle без бизнес-эффектов.
+// This turn:
+//   • Каждая строка теперь кликабельная: <a href="{site_url || https://domain}">
+//     открывается в новой вкладке. Если URL нет — рендерится <div>.
+//   • Имя строки = brand_name || source (brand_name приходит из
+//     ref.shop_directory через backend); сырой домен — в title= для tooltip.
+//   • Для длинных названий: text-overflow: ellipsis + native browser
+//     tooltip через атрибут title (без новых библиотек).
+//   • Toggle "Показать ещё N магазинов" / "Свернуть список" вынесен на
+//     глобальный data-action="toggle-coverage" делегатор в app.js —
+//     избавляет от риска потери click-handler'а при пере-рендере.
 //
 // Подписан только на select.stats — структура данных не трогается.
 
@@ -27,20 +32,40 @@ function renderEmpty() {
   host.innerHTML = '<div class="coverage-empty">Не удалось загрузить покрытие.</div>';
 }
 
+function shopLabel(s) {
+  if (s && s.brand_name) return String(s.brand_name);
+  if (s && s.source) return String(s.source);
+  return '—';
+}
+
+function shopHref(s) {
+  if (!s) return null;
+  if (s.site_url && /^https?:\/\//i.test(String(s.site_url))) return String(s.site_url);
+  if (s.source && String(s.source).indexOf('.') > 0) return 'https://' + String(s.source);
+  return null;
+}
+
 function rowHtml(s, max) {
   const count = s.sku_count || 0;
   const pct = max > 0 ? Math.max(2, Math.round((count / max) * 100)) : 0;
-  return (
-    '<div class="coverage-row">' +
-      '<span class="coverage-row__name" title="' + escapeHtml(String(s.source)) + '">' +
-        escapeHtml(String(s.source)) +
-      '</span>' +
-      '<div class="coverage-row__bar">' +
-        '<div class="coverage-row__fill" style="width:' + pct + '%"></div>' +
-      '</div>' +
-      '<span class="coverage-row__value">' + fmtInt(count) + '</span>' +
-    '</div>'
-  );
+  const label = shopLabel(s);
+  const tooltip = s.brand_name && s.source ? String(s.source) : label;
+  const href = shopHref(s);
+
+  const inner =
+    '<span class="coverage-row__name" title="' + escapeHtml(tooltip) + '">' +
+      escapeHtml(label) +
+    '</span>' +
+    '<div class="coverage-row__bar">' +
+      '<div class="coverage-row__fill" style="width:' + pct + '%"></div>' +
+    '</div>' +
+    '<span class="coverage-row__value">' + fmtInt(count) + '</span>';
+
+  if (href) {
+    return '<a class="coverage-row coverage-row--link" href="' + escapeHtml(href) +
+      '" target="_blank" rel="noopener">' + inner + '</a>';
+  }
+  return '<div class="coverage-row">' + inner + '</div>';
 }
 
 function paint() {
@@ -58,11 +83,16 @@ function paint() {
   const remaining = total - DEFAULT_VISIBLE;
   let toggleHtml = '';
   if (remaining > 0) {
-    const moreLabel = 'Показать ещё ' + fmtInt(remaining) + ' ' +
-      pluralShops(remaining);
-    toggleHtml = '<button type="button" class="coverage-toggle" data-coverage-toggle>' +
-      (expanded ? 'Скрыть' : escapeHtml(moreLabel)) +
-    '</button>';
+    // Toggle используется через event-delegation (см. app.js); никаких
+    // локальных click-обработчиков, которые ломаются при перерисовке.
+    const label = expanded
+      ? 'Свернуть список'
+      : 'Показать ещё ' + fmtInt(remaining) + ' ' + pluralShops(remaining);
+    toggleHtml = '<button type="button" class="coverage-toggle" ' +
+      'data-action="toggle-coverage" ' +
+      'aria-expanded="' + (expanded ? 'true' : 'false') + '">' +
+      escapeHtml(label) +
+      '</button>';
   }
 
   const stats = select.stats(store.getState()) || {};
@@ -76,14 +106,6 @@ function paint() {
         (stats.snapshot_date ? fmtDateISO(stats.snapshot_date) : '—') +
       '</span>' +
     '</div>';
-
-  const btn = host.querySelector('[data-coverage-toggle]');
-  if (btn) {
-    btn.addEventListener('click', function () {
-      expanded = !expanded;
-      paint();
-    });
-  }
 
   setMeta(total === 1 ? '1 источник' : total + ' источников');
 }
@@ -102,6 +124,13 @@ function applyStats(stats) {
   sortedSources = (stats.sources || []).slice().sort(function (a, b) {
     return (b.sku_count || 0) - (a.sku_count || 0);
   });
+  paint();
+}
+
+// Toggle handler called by event-delegation (app.js). Module-scope
+// `expanded` is the source of truth; re-paints from current sortedSources.
+export function toggleCoverage() {
+  expanded = !expanded;
   paint();
 }
 

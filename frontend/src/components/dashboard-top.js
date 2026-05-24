@@ -3,13 +3,12 @@
 // API-вызовов, без изменений в store / chat engine.
 //
 // This turn:
-//   • Удалена секция "Выводы Flora AI" — она дублировала карточки.
-//   • CTA-логика без изменений: pickProductUrl(row) проверяет
-//     product_url > url > product_key. Если backend начнёт отдавать
-//     любое из этих полей в price_stats / top_price_changes — CTA
-//     автоматически станет "Открыть товар" с правильным URL. Сейчас
-//     в финальном SELECT эти поля отсутствуют, поэтому все «товарные»
-//     карточки fallback'аются на "Открыть магазин" (sourceDomain).
+//   • Подключён brand_name + site_url из ref.shop_directory.
+//     KNOWN_SOURCES / sourceDomain удалены — backend теперь сам
+//     отдаёт каждой строке `site_url` (либо null, тогда fallback на
+//     'https://' + source).
+//   • pickCta всё ещё проверяет product_url > url > product_key для
+//     товарного линка; если их нет — берёт row.site_url.
 //
 // Контракты askPreset / select.stats / store.subscribeSlice — не
 // трогаются.
@@ -20,34 +19,7 @@ import { escapeHtml, fmtInt, fmtMoney, fmtDateISO } from '../format.js';
 
 let host = null;
 
-// ── source-name → external URL ───────────────────────────────────────
-
-const KNOWN_SOURCES = {
-  'florist':     'https://florist.ru',
-  'florist.ru':  'https://florist.ru',
-  'florist_ru':  'https://florist.ru',
-  'flowwow':     'https://flowwow.com',
-  'flowwow.com': 'https://flowwow.com',
-  'semicvetic':  'https://semicvetic.com',
-  'semicvetik':  'https://semicvetic.com',
-  'семицветик': 'https://semicvetic.com',
-  'azalia':      'https://azalianow.ru',
-  'azalianow':   'https://azalianow.ru',
-  'азалия':     'https://azalianow.ru',
-  'dostavkatsvetov':    'https://dostavkatsvetov.ru',
-  'dostavkatsvetov.ru': 'https://dostavkatsvetov.ru',
-};
-
-function sourceDomain(source) {
-  if (source === null || source === undefined) return null;
-  const raw = String(source).trim();
-  if (!raw) return null;
-  const s = raw.toLowerCase();
-  if (KNOWN_SOURCES[s]) return KNOWN_SOURCES[s];
-  if (s.indexOf('://') >= 0) return safeUrl(raw);
-  if (s.indexOf('.') > 0) return 'https://' + s;
-  return null;
-}
+// ── URL helpers ─────────────────────────────────────────────────────
 
 function safeUrl(url) {
   if (!url) return null;
@@ -58,6 +30,27 @@ function safeUrl(url) {
   if (s.charAt(0) === '/') return s;
   if (/^https?:\/\//i.test(s)) return s;
   return null;
+}
+
+// Backend uses ref.shop_directory.site_url; if missing, fall back to
+// scheme + raw domain.
+function shopUrl(row) {
+  if (!row) return null;
+  const su = safeUrl(row.site_url);
+  if (su) return su;
+  const src = row.source;
+  if (src && String(src).indexOf('.') > 0) {
+    return 'https://' + String(src);
+  }
+  return null;
+}
+
+// Brand name fallback: backend `brand_name` || raw `source` || '—'.
+function shopLabel(row) {
+  if (!row) return '—';
+  if (row.brand_name) return String(row.brand_name);
+  if (row.source) return String(row.source);
+  return '—';
 }
 
 // Priority-ordered pick of a product URL from a row:
@@ -72,12 +65,12 @@ function pickProductUrl(row) {
   return null;
 }
 
-// Returns ["Открыть товар", productUrl] if a product URL exists,
-// otherwise ["Открыть магазин", sourceDomain(row.source) || null].
+// Returns ["Открыть товар", productUrl] if a product URL exists on the
+// row, otherwise ["Открыть магазин", shopUrl(row)].
 function pickCta(row) {
   const productUrl = pickProductUrl(row);
   if (productUrl) return ['Открыть товар', productUrl];
-  return ['Открыть магазин', sourceDomain(row && row.source) || null];
+  return ['Открыть магазин', shopUrl(row)];
 }
 
 // ── insight card markup ─────────────────────────────────────────────
@@ -298,7 +291,7 @@ function applyStatsSlice(stats) {
       title: 'Лидер рынка сохраняет преимущество по ассортименту',
       text:  text + '.',
       recommendation: recommendLeader(share),
-      href:  sourceDomain(leader.source),
+      href:  shopUrl(leader),
       ctaLabel: 'Открыть магазин',
     });
   }
@@ -341,7 +334,7 @@ function bootstrap() {
         ? Math.round(avgs.reduce(function (a, b) { return a + b; }, 0) / avgs.length)
         : null;
       const text = 'Обнаружено предложение стоимостью ' + fmtMoney(topMax) +
-                   ' — подтверждает наличие покупателей с высоким чеком.';
+                   ' — подтверждает наличие предложений в высоком ценовом сегменте.';
       const cta = pickCta(topRow);
       setInsight(1, {
         title: 'На рынке есть предложения с высоким чеком',
