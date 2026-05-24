@@ -172,11 +172,23 @@ function renderShell() {
 
 // ── insight binders ─────────────────────────────────────────────────
 
+// Отслеживаем, какие карточки уже получили реальные данные / явный
+// fallback. Если по какой-то причине через TIMEOUT_MS карточка
+// остаётся в скелетоне (askPreset завис, или часть массива пустая) —
+// safety-таймер заполняет её честным fallback'ом.
+const filled = [false, false, false, false];
+const TIMEOUT_MS = 15000;
+
 function setInsight(idx, opts) {
   const grid = document.getElementById('insightsGrid');
   if (!grid) return;
   const card = grid.children[idx];
   if (!card) return;
+  // Любое присвоение через setInsight считаем за «карточка заполнена».
+  filled[idx] = true;
+  // Сбрасываем fallback-маркер, если ранее карточка была в fallback'е.
+  card.removeAttribute('data-card-state');
+
   if (opts.title !== undefined) {
     const t = card.querySelector('.insight-card__title');
     if (t) t.textContent = opts.title;
@@ -204,6 +216,36 @@ function setInsight(idx, opts) {
         cta.setAttribute('aria-disabled', 'true');
       }
     }
+  }
+}
+
+// Единый honest-fallback: используется когда конкретная карточка
+// не может быть заполнена реальными данными (askPreset упал, данных
+// нет, или массив отфильтровался досуха). Никаких выдумок.
+// CSS-марker `data-card-state="fallback"` на карточке прячет CTA
+// (см. styles.css — `.insight-card[data-card-state="fallback"] .insight-card__cta`).
+function setInsightFallback(idx, reason) {
+  const grid = document.getElementById('insightsGrid');
+  if (!grid) return;
+  const card = grid.children[idx];
+  if (!card) return;
+
+  filled[idx] = true;
+  card.setAttribute('data-card-state', 'fallback');
+
+  const t = card.querySelector('.insight-card__title');
+  const x = card.querySelector('.insight-card__text');
+  const r = card.querySelector('.insight-card__rec-text');
+
+  if (t) t.textContent = 'Недостаточно данных для вывода';
+  if (x) x.textContent = reason || 'Пока не найдено значимого изменения цены в этом направлении.';
+  if (r) r.textContent = 'Продолжить наблюдение за динамикой рынка.';
+
+  // Деактивируем CTA — пользователю не на что переходить.
+  const cta = card.querySelector('.insight-card__cta');
+  if (cta) {
+    cta.setAttribute('href', '#');
+    cta.setAttribute('aria-disabled', 'true');
   }
 }
 
@@ -294,6 +336,9 @@ function applyStatsSlice(stats) {
       href:  shopUrl(leader),
       ctaLabel: 'Открыть магазин',
     });
+  } else {
+    // stats.loaded === true, но магазинов нет — честный fallback.
+    setInsightFallback(0, 'Источники подключены, но статистика по ассортименту ещё не сформирована.');
   }
 }
 
@@ -304,7 +349,10 @@ function bootstrap() {
   // Market-wide pricing (avg / min / max + top-price insight)
   askPreset('price_stats').then(function (r) {
     const data = (r && r.payload && Array.isArray(r.payload.data)) ? r.payload.data : [];
-    if (!data.length) return;
+    if (!data.length) {
+      setInsightFallback(1, 'Цены по магазинам пока не собраны.');
+      return;
+    }
 
     let mins = [], avgs = [], maxs = [];
     let topRow = null, topMax = -Infinity;
@@ -343,13 +391,25 @@ function bootstrap() {
         href:  cta[1],
         ctaLabel: cta[0],
       });
+    } else {
+      // Цены пришли, но max_price ни у кого не определён — fallback.
+      setInsightFallback(1, 'Среди подключённых магазинов нет данных о максимальной цене.');
     }
-  }).catch(function () { /* keep skeleton */ });
+  }).catch(function () {
+    // /ask упал — карточка #1 должна выйти из скелетон-состояния.
+    setInsightFallback(1, 'Не удалось загрузить статистику цен.');
+  });
 
   // Drop / Rise insights
   askPreset('top_price_changes').then(function (r) {
     const data = (r && r.payload && Array.isArray(r.payload.data)) ? r.payload.data : [];
-    if (!data.length) return;
+    if (!data.length) {
+      // Top-price-changes pусто (например, в БД только один snapshot day) —
+      // обе карточки получают честный fallback.
+      setInsightFallback(2, 'За сутки не зафиксировано значимых изменений цен.');
+      setInsightFallback(3, 'За сутки не зафиксировано значимых изменений цен.');
+      return;
+    }
 
     const drops = data.filter(function (x) { return typeof x.diff === 'number' && x.diff < 0; })
                       .sort(function (a, b) { return a.diff - b.diff; });
@@ -382,6 +442,8 @@ function bootstrap() {
         href:  cta[1],
         ctaLabel: cta[0],
       });
+    } else {
+      setInsightFallback(2, 'За сутки не зафиксировано значимых снижений цен.');
     }
     if (rises.length) {
       const u = rises[0];
@@ -409,8 +471,23 @@ function bootstrap() {
         href:  cta[1],
         ctaLabel: cta[0],
       });
+    } else {
+      setInsightFallback(3, 'За сутки не зафиксировано значимого роста цен.');
     }
-  }).catch(function () { /* keep skeleton */ });
+  }).catch(function () {
+    // /ask упал — обе карточки должны выйти из скелетон-состояния.
+    setInsightFallback(2, 'Не удалось загрузить изменения цен.');
+    setInsightFallback(3, 'Не удалось загрузить изменения цен.');
+  });
+
+  // Safety: если что-то совсем зависло (сеть, отсутствующая таблица,
+  // молчащий контейнер) — после TIMEOUT_MS принудительно ставим
+  // fallback на любую карточку, которая всё ещё в скелетоне.
+  setTimeout(function () {
+    for (let i = 0; i < filled.length; i++) {
+      if (!filled[i]) setInsightFallback(i, 'Данные пока не получены.');
+    }
+  }, TIMEOUT_MS);
 }
 
 export function mountDashboardTop(hostEl) {

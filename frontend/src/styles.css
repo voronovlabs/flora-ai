@@ -933,60 +933,149 @@ a.coverage-row:visited {
     padding: 16px var(--gutter) 120px;
   }
 
+  /* На планшете/мобильном панель результатов едет ВНИЗ под основной
+     контент, а не превращается в slide-over. Это убирает overlay
+     и проблему перекрытия. */
   .analytics-panel {
-    position: fixed; top: var(--header-h); right: -100%;
-    width: min(440px, 92vw);
-    height: calc(100vh - var(--header-h));
-    z-index: 60;
-    transition: right 0.28s ease;
-    border-radius: 0;
-    background: var(--bg-app);
-    padding: 16px;
-    box-shadow: var(--shadow-lg);
+    position: static;
+    width: 100%;
+    height: auto;
     max-height: none;
+    border-radius: 0;
+    background: transparent;
+    padding: 0;
+    box-shadow: none;
+    z-index: auto;
+    transition: none;
   }
-  .analytics-panel.open { right: 0; }
+  .analytics-panel.open { right: auto; }
 
+  /* Overlay больше не нужен — панель в потоке. */
+  .overlay,
+  .overlay.active { display: none !important; }
+
+  /* Mobile-tabs (chat/results) — артефакт slide-over подхода. Скрываем. */
+  .mobile-tabs { display: none !important; }
   .workspace[data-active-tab="results"] .chat-area,
-  .workspace[data-active-tab="results"] .hero { display: none; }
+  .workspace[data-active-tab="results"] .hero { display: flex; }
 
-  .mobile-tabs { display: inline-flex; }
-
-  /* On mobile composer detaches from hero flow and pins to viewport */
-  .hero { padding: 24px 20px 20px; }
+  /* Composer на мобильном остаётся в потоке hero — без fixed. */
   .hero__composer {
-    position: fixed;
-    left: 16px; right: 16px; bottom: 16px;
-    z-index: 30;
-    box-shadow: var(--shadow-lg);
-    margin: 0;
-    background: rgba(255,255,255,0.94);
-    backdrop-filter: blur(10px);
-    -webkit-backdrop-filter: blur(10px);
+    position: static;
+    background: transparent;
+    box-shadow: none;
   }
-
-  .header-status { display: none; }
 }
 
-@media (max-width: 640px) {
-  :root { --gutter: 16px; }
-  .app-header__inner { gap: 12px; padding: 0 16px; }
+/* ──────── Mobile-first <=768px ──────── */
+
+@media (max-width: 768px) {
+  /* overflow-guard — защита от случайного выпадения за viewport.
+     Это страховка, не костыль: ниже найдены и исправлены реальные
+     источники horizontal overflow. */
+  html, body { overflow-x: hidden; }
+
+  :root { --gutter: 14px; }
+
+  .app-shell {
+    padding: 14px var(--gutter) 24px;
+    gap: 16px;
+  }
+
+  /* Header — компактный, без nav, со скрытой вторичной строкой статуса. */
+  .app-header__inner { padding: 0 14px; gap: 10px; }
   .header-nav { display: none; }
+  .header-side { gap: 6px; }
+  .header-status { padding: 4px 8px; }
+  .header-status__secondary { display: none; }
+  .header-status__primary { font-size: 12px; }
 
-  .hero { padding: 20px 18px 18px; border-radius: var(--r-xl); }
-  .hero__title { font-size: 21px; }
-  .hero__subtitle { font-size: 13.5px; }
-  .hero__pill { font-size: 10px; padding: 4px 9px; }
-  .hero-chip { font-size: 12px; padding: 5px 10px; }
-  .hero__pulse { font-size: 12px; }
+  /* Brand — оставляем компактным. */
+  .brand__mark { width: 28px; height: 28px; font-size: 16px; }
+  .brand__name-row { font-size: 14px; }
+  .brand__tag { display: none; }
 
-  .insights-grid { grid-template-columns: 1fr; }
-  .insight-card__main { padding: 12px 14px 12px; }
-  .insight-card__title { font-size: 14px; }
-  .insight-card__text  { font-size: 12.5px; }
-  .insight-card__cta   { padding: 9px 14px; }
+  /* Hero — ниже, тоньше, без декоративных пятен. */
+  .hero { padding: 16px 14px 14px; gap: 10px; border-radius: var(--r-lg); }
+  .hero__decor { display: none; }
+  .hero__title { font-size: 22px; line-height: 1.22; }
+  .hero__subtitle { font-size: 12.5px; line-height: 1.45; }
+  .hero__live { font-size: 11.5px; }
+  .hero__chips { gap: 4px; }
+  .hero-chip { font-size: 11px; padding: 3px 8px; }
+  /* Глобальный пульс «средняя / от / до» на мобильном — мало пользы,
+     сокращаем шум. */
+  .hero__pulse { display: none; }
 
-  .actions-row { gap: 6px; }
+  /* Composer внутри hero, нормальная плотность. */
+  .composer { padding: 6px 8px; border-radius: var(--r-md); }
+  .composer__input { font-size: 14px; min-height: 28px; }
+  .composer__send { width: 36px; height: 36px; border-radius: 10px; }
 
-  .hero__composer { left: 12px; right: 12px; bottom: 12px; }
+  /* Insights grid: 1 в ряд, плотнее. */
+  .insights-grid { grid-template-columns: 1fr; gap: 10px; }
+  .insight-card__main { padding: 12px 14px; gap: 6px; }
+  .insight-card__icon { width: 26px; height: 26px; font-size: 14px; }
+  .insight-card__title { font-size: 13.5px; line-height: 1.3; }
+  .insight-card__text  { font-size: 12.5px; line-height: 1.45; }
+  .insight-card__rec   { font-size: 12px; line-height: 1.45; }
+  .insight-card__cta   { padding: 9px 14px; font-size: 12px; }
+
+  /* Section heads ─ компактнее. */
+  .dashboard-top { gap: 18px; }
+  .dashboard-section { gap: 10px; }
+  .section-title { font-size: 11px; }
+  .section-meta  { font-size: 11px; }
+
+  /* Action pills → горизонтальный scroll вместо сетки.
+     Кнопки не переносим по строкам, занимают одну линию + scroll. */
+  .actions-row {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    margin: 0 calc(-1 * var(--gutter));
+    padding: 2px var(--gutter) 6px;
+    gap: 8px;
+    scrollbar-width: thin;
+  }
+  .actions-row::-webkit-scrollbar { height: 4px; }
+  .actions-row::-webkit-scrollbar-thumb { background: var(--border-strong); border-radius: 4px; }
+  .action-pill {
+    flex-shrink: 0;
+    padding: 9px 14px;
+    font-size: 12.5px;
+  }
+  .action-pill__icon { width: 22px; height: 22px; }
+
+  /* Правая панель: inline ниже контента, компактные карточки. */
+  .analytics-panel { gap: 12px; margin-top: 4px; }
+  .panel-card { border-radius: var(--r-md); }
+  .panel-card__head { padding: 12px 14px 8px; }
+  .panel-card__body { padding: 10px 14px 12px; font-size: 13px; }
+  .panel-card__body--scroll { max-height: none; min-height: 0; }
+  .panel-card__body--intro { padding: 8px 14px 12px; }
+
+  /* Coverage список ниже плотнее, длинные названия — ellipsis уже стоит. */
+  .coverage-row { gap: 8px; }
+  .coverage-row__name { font-size: 12px; }
+  .coverage-row__value { font-size: 12px; }
+  .coverage-toggle { font-size: 11.5px; padding: 6px 0; }
+
+  /* Results table: горизонтальный скролл вместо распирания контейнера. */
+  .data-table-container { overflow-x: auto; }
+  .data-table { font-size: 12px; }
+  .data-table th, .data-table td { padding: 7px 9px; white-space: nowrap; }
+
+  /* Скрыть mobile-toggle крестик: панель и так встроена. */
+  .mobile-toggle { display: none !important; }
+
+  /* Chat-area внутри workspace — нормальная плотность. */
+  .chat-area { gap: 10px; }
+}
+
+/* Очень узкий экран (старые iPhone SE и т.п.) */
+@media (max-width: 360px) {
+  .hero__title { font-size: 20px; }
+  .insight-card__main { padding: 10px 12px; }
+  .action-pill { padding: 8px 12px; font-size: 12px; }
 }
