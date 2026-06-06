@@ -970,65 +970,95 @@ a.coverage-row:visited {
 /* ──────── Mobile-first <=768px ──────── */
 
 @media (max-width: 768px) {
-  /* overflow-guard — защита от случайного выпадения за viewport.
-     Это страховка, не костыль: ниже найдены и исправлены реальные
-     источники horizontal overflow. */
-  html, body { overflow-x: hidden; }
+  /* === Глобальные guard'ы от horizontal overflow === */
+  /* width:100% + min-width:0 на критичных flex-/grid-контейнерах +
+     overflow-x:hidden на body. Покрывает 99% случаев когда что-то
+     "распирает" страницу (длинное название бренда, широкая таблица). */
+  html, body {
+    width: 100%;
+    max-width: 100%;
+    overflow-x: hidden;
+  }
+  body { min-width: 0; }
+  .app-shell, .workspace, .analytics-panel,
+  .hero, .dashboard-section, .panel-card { min-width: 0; max-width: 100%; }
 
-  :root { --gutter: 14px; }
+  :root { --gutter: 14px; --header-h: 56px; }
 
   .app-shell {
-    padding: 14px var(--gutter) 24px;
-    gap: 16px;
+    padding: 12px var(--gutter) 24px;
+    gap: 14px;
   }
 
-  /* Header — компактный, без nav, со скрытой вторичной строкой статуса. */
-  .app-header__inner { padding: 0 14px; gap: 10px; }
-  .header-nav { display: none; }
-  .header-side { gap: 6px; }
-  .header-status { padding: 4px 8px; }
-  .header-status__secondary { display: none; }
-  .header-status__primary { font-size: 12px; }
+  /* === Header === */
+  /* Высота 56px, только бренд + статус. nav и user-icon скрываются. */
+  .app-header { height: var(--header-h); }
+  .app-header__inner { padding: 0 14px; gap: 8px; height: var(--header-h); }
+  .header-nav { display: none !important; }
+  /* User-icon (👤) на mobile прячем — на сенсорах не нужен. */
+  .header-side .icon-btn,
+  .header-side .icon-btn--ghost { display: none !important; }
+  .header-side { gap: 6px; margin-left: auto; }
 
-  /* Brand — оставляем компактным. */
-  .brand__mark { width: 28px; height: 28px; font-size: 16px; }
-  .brand__name-row { font-size: 14px; }
-  .brand__tag { display: none; }
+  /* Status badge — короткий "Актуально". Secondary прячется (см.
+     header-status.js: при <=768px primary становится compact-копией). */
+  .header-status { padding: 4px 9px; gap: 5px; }
+  .header-status__secondary { display: none !important; }
+  .header-status__primary { font-size: 12px; font-weight: 600; }
+  .header-status__dot { width: 6px; height: 6px; }
 
-  /* Hero — ниже, тоньше, без декоративных пятен. */
-  .hero { padding: 16px 14px 14px; gap: 10px; border-radius: var(--r-lg); }
-  .hero__decor { display: none; }
-  .hero__title { font-size: 22px; line-height: 1.22; }
-  .hero__subtitle { font-size: 12.5px; line-height: 1.45; }
-  .hero__live { font-size: 11.5px; }
-  .hero__chips { gap: 4px; }
-  .hero-chip { font-size: 11px; padding: 3px 8px; }
-  /* Глобальный пульс «средняя / от / до» на мобильном — мало пользы,
-     сокращаем шум. */
-  .hero__pulse { display: none; }
+  /* Brand: 🌿 + Flora AI, тег скрыт. */
+  .brand { gap: 8px; min-width: 0; }
+  .brand__mark { width: 28px; height: 28px; font-size: 16px; flex-shrink: 0; }
+  .brand__name { min-width: 0; }
+  .brand__name-row { font-size: 14px; white-space: nowrap; }
+  .brand__tag { display: none !important; }
 
-  /* Composer внутри hero, нормальная плотность. */
+  /* === Hero === */
+  /* Title 22px, subtitle 13.5px, никаких декоративных пятен, chips и
+     pulse скрыты — на узком экране они визуально мусорят. */
+  .hero {
+    padding: 16px 14px 14px;
+    gap: 10px;
+    border-radius: var(--r-lg);
+  }
+  .hero__decor { display: none !important; }
+  .hero__head { gap: 4px; }
+  .hero__title { font-size: 22px; line-height: 1.22; letter-spacing: -0.02em; }
+  .hero__subtitle { font-size: 13.5px; line-height: 1.45; }
+  /* Hero chips ("SKU / конкурентов / обновлено") на mobile скрываем —
+     цифры дублируются в самих рекомендациях и в карточке "Подключённые
+     магазины" ниже. */
+  .hero__chips { display: none !important; }
+  /* Live-строка "Подключаюсь…" / "Отслеживается N магазинов" тоже
+     прячется на mobile — те же цифры в header-status и ниже. */
+  .hero__live { display: none !important; }
+  .hero__pulse { display: none !important; }
+
+  /* Composer внутри hero, компактно. */
   .composer { padding: 6px 8px; border-radius: var(--r-md); }
   .composer__input { font-size: 14px; min-height: 28px; }
   .composer__send { width: 36px; height: 36px; border-radius: 10px; }
 
-  /* Insights grid: 1 в ряд, плотнее. */
+  /* === Insights === */
   .insights-grid { grid-template-columns: 1fr; gap: 10px; }
+  .insight-card { min-width: 0; }
   .insight-card__main { padding: 12px 14px; gap: 6px; }
   .insight-card__icon { width: 26px; height: 26px; font-size: 14px; }
   .insight-card__title { font-size: 13.5px; line-height: 1.3; }
   .insight-card__text  { font-size: 12.5px; line-height: 1.45; }
   .insight-card__rec   { font-size: 12px; line-height: 1.45; }
   .insight-card__cta   { padding: 9px 14px; font-size: 12px; }
+  /* Fallback-карточка ("Недостаточно данных") — без CTA, ниже высотой. */
+  .insight-card[data-card-state="fallback"] .insight-card__cta { display: none; }
 
-  /* Section heads ─ компактнее. */
+  /* Section heads — компактнее. */
   .dashboard-top { gap: 18px; }
   .dashboard-section { gap: 10px; }
   .section-title { font-size: 11px; }
   .section-meta  { font-size: 11px; }
 
-  /* Action pills → горизонтальный scroll вместо сетки.
-     Кнопки не переносим по строкам, занимают одну линию + scroll. */
+  /* === Action pills — горизонтальный scroll === */
   .actions-row {
     flex-wrap: nowrap;
     overflow-x: auto;
@@ -1036,10 +1066,10 @@ a.coverage-row:visited {
     margin: 0 calc(-1 * var(--gutter));
     padding: 2px var(--gutter) 6px;
     gap: 8px;
-    scrollbar-width: thin;
+    scrollbar-width: none;          /* Firefox: тонкая полоса скрыта */
+    -ms-overflow-style: none;       /* IE/Edge */
   }
-  .actions-row::-webkit-scrollbar { height: 4px; }
-  .actions-row::-webkit-scrollbar-thumb { background: var(--border-strong); border-radius: 4px; }
+  .actions-row::-webkit-scrollbar { display: none; height: 0; } /* Safari/Chrome */
   .action-pill {
     flex-shrink: 0;
     padding: 9px 14px;
@@ -1047,35 +1077,71 @@ a.coverage-row:visited {
   }
   .action-pill__icon { width: 22px; height: 22px; }
 
-  /* Правая панель: inline ниже контента, компактные карточки. */
-  .analytics-panel { gap: 12px; margin-top: 4px; }
-  .panel-card { border-radius: var(--r-md); }
-  .panel-card__head { padding: 12px 14px 8px; }
+  /* === Analytics panel === */
+  /* Inline ниже основного контента — никакого sticky, никакого overlay.
+     Любые min-height снимаем — пустых "белых карточек" на mobile не должно
+     быть. */
+  .analytics-panel {
+    position: static !important;
+    width: 100%;
+    height: auto;
+    max-height: none;
+    margin-top: 4px;
+    gap: 12px;
+    background: transparent;
+    box-shadow: none;
+    padding: 0;
+    z-index: auto;
+  }
+  .panel-card { border-radius: var(--r-md); min-width: 0; }
+  .panel-card__head { padding: 12px 14px 8px; gap: 8px; }
+  .panel-card__head .panel-card__title { font-size: 11px; }
   .panel-card__body { padding: 10px 14px 12px; font-size: 13px; }
-  .panel-card__body--scroll { max-height: none; min-height: 0; }
-  .panel-card__body--intro { padding: 8px 14px 12px; }
+  /* CRITICAL: убираем min-height у всех вариантов body — это и есть
+     "огромная белая пустая карточка" внизу экрана. */
+  .panel-card__body--scroll { max-height: none !important; min-height: 0 !important; }
+  .panel-card__body--intro  { padding: 8px 14px 12px; min-height: 0 !important; }
+  /* Overlay никогда не показываем на mobile (от старой slide-over схемы). */
+  .overlay, .overlay.active { display: none !important; }
+  .mobile-tabs { display: none !important; }
+  .mobile-toggle { display: none !important; }
 
-  /* Coverage список ниже плотнее, длинные названия — ellipsis уже стоит. */
-  .coverage-row { gap: 8px; }
+  /* === Coverage list (Подключённые магазины) === */
+  /* Сужаем колонку имени, чтобы длинные бренды не растягивали layout. */
+  .coverage-row {
+    grid-template-columns: minmax(0, 1fr) minmax(60px, 1fr) auto;
+    gap: 8px;
+  }
   .coverage-row__name { font-size: 12px; }
   .coverage-row__value { font-size: 12px; }
   .coverage-toggle { font-size: 11.5px; padding: 6px 0; }
 
-  /* Results table: горизонтальный скролл вместо распирания контейнера. */
+  /* === Results table — горизонтальный скролл внутри контейнера === */
   .data-table-container { overflow-x: auto; }
   .data-table { font-size: 12px; }
   .data-table th, .data-table td { padding: 7px 9px; white-space: nowrap; }
 
-  /* Скрыть mobile-toggle крестик: панель и так встроена. */
-  .mobile-toggle { display: none !important; }
+  /* === Chat area === */
+  /* Когда сообщений нет — chat-area уже скрыт через :has(empty).
+     Дополнительный mobile-страховщик на случай Safari < 15.4: не
+     рендерим лишний воздух. */
+  .chat-area { gap: 10px; min-height: 0; }
+  .chat-messages { padding: 0; min-height: 0; }
+  .chat-messages:empty { display: none; }
 
-  /* Chat-area внутри workspace — нормальная плотность. */
-  .chat-area { gap: 10px; }
+  /* === Tap-friendly === */
+  /* Не даём контенту "ловить" касания через прозрачные блоки. */
+  .hero__decor, .overlay { pointer-events: none; }
 }
 
-/* Очень узкий экран (старые iPhone SE и т.п.) */
-@media (max-width: 360px) {
+/* Очень узкий экран (iPhone SE / Mini / etc.) */
+@media (max-width: 380px) {
+  .hero { padding: 14px 12px 12px; }
   .hero__title { font-size: 20px; }
   .insight-card__main { padding: 10px 12px; }
+  .insight-card__cta { padding: 8px 12px; font-size: 11.5px; }
   .action-pill { padding: 8px 12px; font-size: 12px; }
+  .action-pill__icon { width: 20px; height: 20px; font-size: 12px; }
+  .brand__name-row { font-size: 13px; }
+  .header-status__primary { font-size: 11.5px; }
 }
